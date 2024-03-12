@@ -23,7 +23,7 @@ func GenShortURLToken() string {
 	return base64.URLEncoding.EncodeToString(buf)[:length]
 }
 
-func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
+func CreateServeMux(urlRepo domain.URLRepository, baseURL string) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
@@ -43,7 +43,20 @@ func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
 
 		writer.WriteHeader(http.StatusCreated)
 
-		writer.Write([]byte("http://" + request.Host + "/" + key))
+		bURL := url.URL{}
+		bURL.Host = baseURL
+		if bURL.Scheme == "" {
+			if request.TLS != nil {
+				bURL.Scheme = "https"
+			} else {
+				bURL.Scheme = "http"
+			}
+		}
+		if bURL.Host == "" {
+			bURL.Host = request.Host
+		}
+		bURL.Path = key
+		writer.Write([]byte(bURL.String()))
 	}
 
 	getShortHandler := func(writer http.ResponseWriter, request *http.Request) {
