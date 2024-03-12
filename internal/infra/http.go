@@ -44,7 +44,7 @@ func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
 
 		writer.WriteHeader(http.StatusCreated)
 
-		writer.Write([]byte(*internal.BaseURL + "/" + key))
+		writer.Write([]byte(internal.Config.BaseURL + "/" + key))
 	}
 
 	getShortHandler := func(writer http.ResponseWriter, request *http.Request) {

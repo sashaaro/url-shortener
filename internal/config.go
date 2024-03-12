@@ -1,8 +1,8 @@
 package internal
 
-import (
-	"flag"
-)
+var Config = config{}
 
-var HTTPAddr = flag.String("a", ":8080", "listen address")
-var BaseURL = flag.String("b", "http://localhost:8080", "base url")
+type config struct {
+	ServerAddress string `env:"SERVER_ADDRESS"`
+	BaseURL       string `env:"BASE_URL"`
+}
