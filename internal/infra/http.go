@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 func GenShortURLToken() string {
@@ -22,8 +23,9 @@ func GenShortURLToken() string {
 	return base64.URLEncoding.EncodeToString(buf)[:length]
 }
 
-func CreateServeMux(urlRepo domain.URLRepository) *http.ServeMux {
-	mux := http.NewServeMux()
+func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
 
 	createShortHandler := func(writer http.ResponseWriter, request *http.Request) {
 		b, err := io.ReadAll(request.Body)
@@ -45,9 +47,8 @@ func CreateServeMux(urlRepo domain.URLRepository) *http.ServeMux {
 	}
 
 	getShortHandler := func(writer http.ResponseWriter, request *http.Request) {
-		key := strings.Trim(request.URL.Path, "/")
-
-		originURL, ok := urlRepo.GetByHash(key)
+		hashkey := chi.URLParam(request, "hash")
+		originURL, ok := urlRepo.GetByHash(hashkey)
 		if !ok {
 			http.Error(writer, "Short url not found", http.StatusNotFound)
 			return
@@ -55,15 +56,8 @@ func CreateServeMux(urlRepo domain.URLRepository) *http.ServeMux {
 		http.Redirect(writer, request, originURL.String(), http.StatusTemporaryRedirect)
 	}
 
-	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method == http.MethodPost {
-			createShortHandler(writer, request)
-		} else if request.Method == http.MethodGet {
-			getShortHandler(writer, request)
-		} else {
-			http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	r.Post("/", createShortHandler)
+	r.Get("/{hash}", getShortHandler)
 
-	return mux
+	return r
 }
