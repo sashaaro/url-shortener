@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"io"
 	"net/http"
@@ -23,7 +24,7 @@ func GenShortURLToken() string {
 	return base64.URLEncoding.EncodeToString(buf)[:length]
 }
 
-func CreateServeMux(urlRepo domain.URLRepository, baseURL string) *chi.Mux {
+func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
@@ -43,20 +44,7 @@ func CreateServeMux(urlRepo domain.URLRepository, baseURL string) *chi.Mux {
 
 		writer.WriteHeader(http.StatusCreated)
 
-		bURL := url.URL{}
-		bURL.Host = baseURL
-		if bURL.Scheme == "" {
-			if request.TLS != nil {
-				bURL.Scheme = "https"
-			} else {
-				bURL.Scheme = "http"
-			}
-		}
-		if bURL.Host == "" {
-			bURL.Host = request.Host
-		}
-		bURL.Path = key
-		writer.Write([]byte(bURL.String()))
+		writer.Write([]byte(*internal.BaseURL + "/" + key))
 	}
 
 	getShortHandler := func(writer http.ResponseWriter, request *http.Request) {

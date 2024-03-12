@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/infra"
 	"log"
@@ -8,6 +9,8 @@ import (
 )
 
 func main() {
+	flag.Parse()
+
 	urlRepo := infra.NewMemURLRepository()
-	log.Fatal(http.ListenAndServe(*internal.HTTPAddr, infra.CreateServeMux(urlRepo, *internal.BaseURL)))
+	log.Fatal(http.ListenAndServe(*internal.HTTPAddr, infra.CreateServeMux(urlRepo)))
 }

@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"github.com/sashaaro/url-shortener/internal"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
@@ -12,8 +13,9 @@ import (
 
 func TestIteration2(t *testing.T) {
 	t.Run("create short url, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(NewMemURLRepository(), ""))
+		testServer := httptest.NewServer(CreateServeMux(NewMemURLRepository()))
 		defer testServer.Close()
+		*internal.BaseURL = testServer.URL
 		resp, err := http.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
 		assert.NoError(t, err)
 		defer resp.Body.Close()
