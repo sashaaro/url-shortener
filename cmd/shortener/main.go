@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"github.com/caarlos0/env/v6"
 	"github.com/sashaaro/url-shortener/internal"
-	"github.com/sashaaro/url-shortener/internal/infra"
+	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/handlers"
 	"log"
 	"net/http"
 )
@@ -13,8 +14,8 @@ import (
 func main() {
 	initConfig()
 
-	urlRepo := infra.NewMemURLRepository()
-	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, infra.CreateServeMux(urlRepo)))
+	urlRepo := adapters.NewMemURLRepository()
+	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo)))
 }
 
 func initConfig() {

@@ -1,4 +1,4 @@
-package infra
+package adapters
 
 import (
 	"github.com/sashaaro/url-shortener/internal/domain"
