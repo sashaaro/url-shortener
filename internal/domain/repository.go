@@ -2,9 +2,11 @@ package domain
 
 import "net/url"
 
-type URLKey = string
+type HashKey = string
 
 type URLRepository interface {
-	Add(key URLKey, u url.URL)
-	GetByHash(key URLKey) (url.URL, bool)
+	Add(key HashKey, u url.URL)
+	GetByHash(key HashKey) (url.URL, bool)
 }
+
+type GenShortURLToken = func() HashKey

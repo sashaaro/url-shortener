@@ -10,22 +10,22 @@ var _ domain.URLRepository = &memURLRepository{}
 
 type memURLRepository struct {
 	mx       sync.Mutex
-	urlStore map[domain.URLKey]url.URL
+	urlStore map[domain.HashKey]url.URL
 }
 
 func NewMemURLRepository() domain.URLRepository {
 	return &memURLRepository{
-		urlStore: map[domain.URLKey]url.URL{},
+		urlStore: map[domain.HashKey]url.URL{},
 	}
 }
 
-func (m *memURLRepository) Add(key domain.URLKey, u url.URL) {
+func (m *memURLRepository) Add(key domain.HashKey, u url.URL) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	m.urlStore[key] = u
 }
 
-func (m *memURLRepository) GetByHash(key domain.URLKey) (url.URL, bool) {
+func (m *memURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	u, ok := m.urlStore[key]
