@@ -39,7 +39,7 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 
 	writer.WriteHeader(http.StatusCreated)
 
-	writer.Write([]byte(internal.Config.BaseURL + "/" + key))
+	_, _ = writer.Write([]byte(internal.Config.BaseURL + "/" + key))
 }
 
 func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http.Request) {
