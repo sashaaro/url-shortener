@@ -56,8 +56,8 @@ func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken)
-	r.Post("/", handlers.createShortHandler)
-	r.Get("/{hash}", handlers.getShortHandler)
+	r.Post("/", WithLogging(adapters.Logger, handlers.createShortHandler))
+	r.Get("/{hash}", WithLogging(adapters.Logger, handlers.getShortHandler))
 
 	return r
 }
