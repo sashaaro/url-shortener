@@ -42,7 +42,12 @@ func TestIteration2(t *testing.T) {
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(adapters.NewMemURLRepository()))
+		urlRepo := adapters.NewMemURLRepository()
+		//urlRepo := adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo)
+		testServer := httptest.NewServer(CreateServeMux(
+			urlRepo,
+		))
+		//defer urlRepo.Close()
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
 

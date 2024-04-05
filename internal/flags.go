@@ -9,6 +9,8 @@ import (
 func InitConfig() {
 	serverAddress := flag.String("a", "", "listen address")
 	baseURL := flag.String("b", "", "base url")
+	fileStoragePath := flag.String("f", "/tmp/short-url-db.json", "file path")
+
 	flag.Parse()
 
 	if err := env.Parse(&Config); err != nil {
@@ -19,6 +21,9 @@ func InitConfig() {
 	}
 	if Config.BaseURL == "" {
 		Config.BaseURL = *baseURL
+	}
+	if Config.FileStoragePath == "" {
+		Config.FileStoragePath = *fileStoragePath
 	}
 
 	if Config.ServerAddress == "" {
