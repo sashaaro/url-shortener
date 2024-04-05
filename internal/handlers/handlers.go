@@ -26,14 +26,20 @@ func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenSh
 }
 
 func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *http.Request) {
-	b, err := io.ReadAll(request.Body)
+	body, err := GetDecompressedBody(request)
 	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	b, err := io.ReadAll(body)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	originURL, err := url.Parse(string(b))
 	if err != nil {
-		http.Error(writer, "Invalid url", http.StatusBadRequest)
+		http.Error(writer, "invalid url", http.StatusBadRequest)
 		return
 	}
 	key := r.genShortURLToken()
@@ -67,7 +73,13 @@ type ShortenResponse struct {
 
 func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	var req ShortenRequest
-	err := json.NewDecoder(request.Body).Decode(&req)
+	body, err := GetDecompressedBody(request)
+	if err != nil {
+		http.Error(w, "Failed to read decompressed request body", http.StatusInternalServerError)
+		return
+	}
+	defer body.Close()
+	err = json.NewDecoder(body).Decode(&req)
 	if err != nil {
 		adapters.Logger.Debug("cannot decode request JSON body", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -97,7 +109,7 @@ func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
 	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken)
 	r.Post("/", WithLogging(adapters.Logger, handlers.createShortHandler))
 	r.Get("/{hash}", WithLogging(adapters.Logger, handlers.getShortHandler))
-	r.Post("/api/shorten", WithLogging(adapters.Logger, handlers.shorten))
+	r.Post("/api/shorten", gzipHandle(WithLogging(adapters.Logger, handlers.shorten)))
 
 	return r
 }
