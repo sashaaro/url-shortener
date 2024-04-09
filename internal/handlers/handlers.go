@@ -26,12 +26,7 @@ func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenSh
 }
 
 func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *http.Request) {
-	body, err := GetDecompressedBody(request)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	b, err := io.ReadAll(body)
+	b, err := io.ReadAll(request.Body)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
@@ -73,13 +68,7 @@ type ShortenResponse struct {
 
 func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	var req ShortenRequest
-	body, err := GetDecompressedBody(request)
-	if err != nil {
-		http.Error(w, "Failed to read decompressed request body", http.StatusInternalServerError)
-		return
-	}
-	defer body.Close()
-	err = json.NewDecoder(body).Decode(&req)
+	err := json.NewDecoder(request.Body).Decode(&req)
 	if err != nil {
 		adapters.Logger.Debug("cannot decode request JSON body", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
