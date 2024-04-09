@@ -102,8 +102,8 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger) *chi
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger)
-	r.Post("/", WithLogging(logger, handlers.createShortHandler))
-	r.Get("/{hash}", WithLogging(logger, handlers.getShortHandler))
+	r.Post("/", gzipHandle(WithLogging(logger, handlers.createShortHandler)))
+	r.Get("/{hash}", gzipHandle(WithLogging(logger, handlers.getShortHandler)))
 	r.Post("/api/shorten", gzipHandle(WithLogging(logger, handlers.shorten)))
 
 	return r
