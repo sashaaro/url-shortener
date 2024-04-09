@@ -16,12 +16,18 @@ import (
 type HTTPHandlers struct {
 	urlRepo          domain.URLRepository
 	genShortURLToken domain.GenShortURLToken
+	logger           zap.SugaredLogger
 }
 
-func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenShortURLToken) *HTTPHandlers {
+func NewHTTPHandlers(
+	urlRepo domain.URLRepository,
+	genShortURLToken domain.GenShortURLToken,
+	logger zap.SugaredLogger,
+) *HTTPHandlers {
 	return &HTTPHandlers{
 		urlRepo:          urlRepo,
 		genShortURLToken: genShortURLToken,
+		logger:           logger,
 	}
 }
 
@@ -70,7 +76,7 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	var req ShortenRequest
 	err := json.NewDecoder(request.Body).Decode(&req)
 	if err != nil {
-		adapters.Logger.Debug("cannot decode request JSON body", zap.Error(err))
+		r.logger.Debug("cannot decode request JSON body", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -88,17 +94,17 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(ShortenResponse{Result: createPublicURL(key)})
 	if err != nil {
-		adapters.Logger.Debug("cannot encode response JSON", zap.Error(err))
+		r.logger.Debug("cannot encode response JSON", zap.Error(err))
 	}
 }
 
-func CreateServeMux(urlRepo domain.URLRepository) *chi.Mux {
+func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken)
-	r.Post("/", WithLogging(adapters.Logger, handlers.createShortHandler))
-	r.Get("/{hash}", WithLogging(adapters.Logger, handlers.getShortHandler))
-	r.Post("/api/shorten", gzipHandle(WithLogging(adapters.Logger, handlers.shorten)))
+	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger)
+	r.Post("/", WithLogging(logger, handlers.createShortHandler))
+	r.Get("/{hash}", WithLogging(logger, handlers.getShortHandler))
+	r.Post("/api/shorten", gzipHandle(WithLogging(logger, handlers.shorten)))
 
 	return r
 }

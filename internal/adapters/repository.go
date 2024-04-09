@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/sashaaro/url-shortener/internal/domain"
+	"go.uber.org/zap"
 	"io"
 	"log"
 	"net/url"
@@ -39,7 +40,11 @@ func (m *memURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {
 
 var _ domain.URLRepository = &FileURLRepository{}
 
-func NewFileURLRepository(filePath string, wrapped domain.URLRepository) *FileURLRepository {
+func NewFileURLRepository(
+	filePath string,
+	wrapped domain.URLRepository,
+	logger zap.SugaredLogger,
+) *FileURLRepository {
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
@@ -49,6 +54,7 @@ func NewFileURLRepository(filePath string, wrapped domain.URLRepository) *FileUR
 		file:    file,
 		wrapped: wrapped,
 		encoder: json.NewEncoder(file),
+		logger:  logger,
 	}
 	err = r.load()
 	if err != nil {
@@ -68,6 +74,7 @@ type FileURLRepository struct {
 	file    *os.File
 	encoder *json.Encoder
 	wrapped domain.URLRepository
+	logger  zap.SugaredLogger
 }
 
 func (f *FileURLRepository) load() error {
@@ -83,7 +90,7 @@ func (f *FileURLRepository) load() error {
 
 		u, err := url.Parse(entry.OriginalURL)
 		if err != nil {
-			Logger.Warn("invalid db url entry")
+			f.logger.Warn("invalid db url entry")
 			continue
 		}
 		f.wrapped.Add(entry.ShortURL, *u)
