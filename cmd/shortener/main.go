@@ -11,6 +11,7 @@ import (
 func main() {
 	internal.InitConfig()
 
-	urlRepo := adapters.NewMemURLRepository()
-	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo)))
+	logger := adapters.CreateLogger()
+	urlRepo := adapters.NewFileURLRepository(internal.Config.FileStoragePath, adapters.NewMemURLRepository(), logger)
+	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger)))
 }
