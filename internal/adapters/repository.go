@@ -19,6 +19,12 @@ type memURLRepository struct {
 	urlStore map[domain.HashKey]url.URL
 }
 
+func (m *memURLRepository) BatchAdd(batch []domain.BatchItem) {
+	for _, item := range batch {
+		m.Add(item.HashKey, item.URL)
+	}
+}
+
 func NewMemURLRepository() domain.URLRepository {
 	return &memURLRepository{
 		urlStore: map[domain.HashKey]url.URL{},
@@ -75,6 +81,12 @@ type FileURLRepository struct {
 	encoder *json.Encoder
 	wrapped domain.URLRepository
 	logger  zap.SugaredLogger
+}
+
+func (f *FileURLRepository) BatchAdd(batch []domain.BatchItem) {
+	for _, item := range batch {
+		f.Add(item.HashKey, item.URL)
+	}
 }
 
 func (f *FileURLRepository) load() error {

@@ -14,6 +14,27 @@ type PgURLRepository struct {
 	conn *pgx.Conn
 }
 
+func (r *PgURLRepository) BatchAdd(batch []domain.BatchItem) {
+	tx, err := r.conn.BeginTx(context.Background(), pgx.TxOptions{})
+	if err != nil {
+		panic(err)
+	}
+	// nolint:errcheck
+	defer tx.Rollback(context.Background())
+
+	for _, item := range batch {
+		_, err := tx.Exec(context.Background(), "INSERT INTO urls (key, url) VALUES ($1, $2)", item.HashKey, item.URL.String())
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (r *PgURLRepository) Add(key domain.HashKey, u url.URL) {
 	_, err := r.conn.Exec(context.Background(), "INSERT INTO urls (key, url) VALUES ($1, $2)", key, u.String())
 	if err != nil {

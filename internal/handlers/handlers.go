@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 )
 
 type HTTPHandlers struct {
@@ -98,6 +100,65 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	}
 }
 
+type ShortenBatchItem struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type ShortenItemRes struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request) {
+	var req []ShortenBatchItem
+	err := json.NewDecoder(request.Body).Decode(&req)
+	if err != nil {
+		r.logger.Debug("cannot decode request JSON body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if len(req) == 0 {
+		w.WriteHeader(http.StatusCreated)
+		return
+	}
+
+	slices.SortFunc(req, func(a, b ShortenBatchItem) int {
+		return cmp.Compare(a.CorrelationID, b.CorrelationID)
+	})
+
+	originURLs := make([]domain.BatchItem, 0, len(req))
+	for _, item := range req {
+		u, err := url.Parse(item.OriginalURL)
+		if err != nil {
+			http.Error(w, "Invalid url", http.StatusBadRequest)
+			return
+		}
+		originURLs = append(originURLs, domain.BatchItem{
+			HashKey: r.genShortURLToken(),
+			URL:     *u,
+		})
+	}
+
+	r.urlRepo.BatchAdd(originURLs)
+
+	resp := make([]ShortenItemRes, 0, len(originURLs))
+	for i, item := range originURLs {
+		resp = append(resp, ShortenItemRes{
+			CorrelationID: req[i].CorrelationID,
+			ShortURL:      createPublicURL(item.HashKey),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		r.logger.Debug("cannot encode response JSON", zap.Error(err))
+	}
+}
+
 func (r *HTTPHandlers) ping(w http.ResponseWriter, request *http.Request) {
 	err := r.conn.Ping(context.Background())
 	if err == nil {
@@ -114,6 +175,7 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn
 	r.Post("/", gzipHandle(WithLogging(logger, handlers.createShortHandler)))
 	r.Get("/{hash}", gzipHandle(WithLogging(logger, handlers.getShortHandler)))
 	r.Post("/api/shorten", gzipHandle(WithLogging(logger, handlers.shorten)))
+	r.Post("/api/shorten/batch", gzipHandle(WithLogging(logger, handlers.batchShorten)))
 	r.Get("/ping", handlers.ping)
 
 	return r
