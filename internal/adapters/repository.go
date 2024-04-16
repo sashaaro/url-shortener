@@ -19,10 +19,14 @@ type memURLRepository struct {
 	urlStore map[domain.HashKey]url.URL
 }
 
-func (m *memURLRepository) BatchAdd(batch []domain.BatchItem) {
+func (m *memURLRepository) BatchAdd(batch []domain.BatchItem) error {
 	for _, item := range batch {
-		m.Add(item.HashKey, item.URL)
+		err := m.Add(item.HashKey, item.URL)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func NewMemURLRepository() domain.URLRepository {
@@ -31,10 +35,15 @@ func NewMemURLRepository() domain.URLRepository {
 	}
 }
 
-func (m *memURLRepository) Add(key domain.HashKey, u url.URL) {
+func (m *memURLRepository) Add(key domain.HashKey, u url.URL) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
+	//_, ok := m.urlStore[key]
+	//if ok {
+	//	return domain.ErrURLAlreadyExists
+	//}
 	m.urlStore[key] = u
+	return nil
 }
 
 func (m *memURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {
@@ -83,10 +92,14 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
-func (f *FileURLRepository) BatchAdd(batch []domain.BatchItem) {
+func (f *FileURLRepository) BatchAdd(batch []domain.BatchItem) error {
 	for _, item := range batch {
-		f.Add(item.HashKey, item.URL)
+		err := f.Add(item.HashKey, item.URL)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (f *FileURLRepository) load() error {
@@ -105,7 +118,10 @@ func (f *FileURLRepository) load() error {
 			f.logger.Warn("invalid db url entry")
 			continue
 		}
-		f.wrapped.Add(entry.ShortURL, *u)
+		err = f.wrapped.Add(entry.ShortURL, *u)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -114,16 +130,17 @@ func (f *FileURLRepository) Close() error {
 	return f.file.Close()
 }
 
-func (f FileURLRepository) Add(key domain.HashKey, u url.URL) {
-	err := f.encoder.Encode(fileEntry{
+func (f FileURLRepository) Add(key domain.HashKey, u url.URL) error {
+	err := f.wrapped.Add(key, u)
+	if err != nil {
+		return err
+	}
+	err = f.encoder.Encode(fileEntry{
 		ID:          uuid.New(),
 		ShortURL:    key,
 		OriginalURL: u.String(),
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	f.wrapped.Add(key, u)
+	return err
 }
 
 func (f FileURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {

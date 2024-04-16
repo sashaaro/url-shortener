@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
@@ -46,7 +47,16 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 		return
 	}
 	key := r.genShortURLToken()
-	r.urlRepo.Add(key, *originURL)
+	err = r.urlRepo.Add(key, *originURL)
+	if errors.Is(err, domain.ErrURLAlreadyExists) {
+		writer.WriteHeader(http.StatusConflict)
+		return
+	}
+	if err != nil {
+		r.logger.Debug("cannot batch add urls", zap.Error(err))
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	writer.WriteHeader(http.StatusCreated)
 
@@ -90,7 +100,16 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	}
 
 	key := r.genShortURLToken()
-	r.urlRepo.Add(key, *originURL)
+	err = r.urlRepo.Add(key, *originURL)
+	if errors.Is(err, domain.ErrURLAlreadyExists) {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	if err != nil {
+		r.logger.Debug("cannot add url", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -140,7 +159,16 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 		})
 	}
 
-	r.urlRepo.BatchAdd(originURLs)
+	err = r.urlRepo.BatchAdd(originURLs)
+	if errors.Is(err, domain.ErrURLAlreadyExists) {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	if err != nil {
+		r.logger.Debug("cannot batch add urls", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	resp := make([]ShortenItemRes, 0, len(originURLs))
 	for i, item := range originURLs {

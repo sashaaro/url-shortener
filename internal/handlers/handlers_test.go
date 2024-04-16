@@ -34,6 +34,7 @@ func TestIteration2(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
+			_, _ = conn.Exec(context.Background(), "TRUNCATE TABLE urls")
 			urlRepo = adapters.NewPgURLRepository(conn)
 		}
 
@@ -60,6 +61,13 @@ func TestIteration2(t *testing.T) {
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+		if internal.Config.DatabaseDSN != "" { // check unique key for database
+			resp, err = httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusConflict, resp.StatusCode)
+		}
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
