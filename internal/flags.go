@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/caarlos0/env/v6"
+	"strings"
 )
 
 func InitConfig() {
@@ -38,7 +39,6 @@ func InitConfig() {
 	if Config.DatabaseDSN == "" {
 		Config.DatabaseDSN = *databaseDSN
 	}
-	if Config.DatabaseDSN == "" {
-		Config.DatabaseDSN = "postgres://postgres:postgres@localhost:5432/postgres"
-	}
+
+	Config.DatabaseDSN = strings.TrimSpace(Config.DatabaseDSN)
 }

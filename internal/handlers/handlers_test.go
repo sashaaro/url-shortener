@@ -3,7 +3,9 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"github.com/jackc/pgx/v5"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/stretchr/testify/require"
@@ -20,10 +22,22 @@ func TestIteration2(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
+	internal.InitConfig()
+
 	logger := adapters.CreateLogger()
 
 	t.Run("create short url, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(adapters.NewMemURLRepository(), logger, nil))
+		urlRepo := adapters.NewMemURLRepository()
+
+		if internal.Config.DatabaseDSN != "" {
+			conn, err := pgx.Connect(context.Background(), internal.Config.DatabaseDSN)
+			if err != nil {
+				panic(err)
+			}
+			urlRepo = adapters.NewPgURLRepository(conn)
+		}
+
+		testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
 		resp, err := httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
@@ -41,6 +55,10 @@ func TestIteration2(t *testing.T) {
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
 		require.Equal(t, "https://github.com", resp.Header.Get("Location"))
+
+		resp, err = httpClient.Get(testServer.URL + "/NoExistShortUrl")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
