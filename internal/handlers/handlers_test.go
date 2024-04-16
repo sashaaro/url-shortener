@@ -23,10 +23,7 @@ func TestIteration2(t *testing.T) {
 	logger := adapters.CreateLogger()
 
 	t.Run("create short url, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(
-			adapters.NewMemURLRepository(),
-			logger,
-		))
+		testServer := httptest.NewServer(CreateServeMux(adapters.NewMemURLRepository(), logger, nil))
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
 		resp, err := httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
@@ -48,10 +45,7 @@ func TestIteration2(t *testing.T) {
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
 		urlRepo := adapters.NewMemURLRepository()
-		testServer := httptest.NewServer(CreateServeMux(
-			adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger),
-			logger,
-		))
+		testServer := httptest.NewServer(CreateServeMux(adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger), logger, nil))
 		//defer urlRepo.Close()
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
