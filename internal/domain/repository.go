@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"errors"
+	"fmt"
 	"net/url"
 )
 
@@ -12,7 +12,15 @@ type BatchItem struct {
 	URL     url.URL
 }
 
-var ErrURLAlreadyExists = errors.New("url already exists")
+type ErrURLAlreadyExists struct {
+	HashKey HashKey
+}
+
+func (e ErrURLAlreadyExists) Error() string {
+	return fmt.Sprintf("url %s already exists", e.HashKey)
+}
+
+var _ error = (*ErrURLAlreadyExists)(nil)
 
 type URLRepository interface {
 	Add(key HashKey, u url.URL) error

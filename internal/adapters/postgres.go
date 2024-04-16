@@ -30,7 +30,12 @@ func (r *PgURLRepository) BatchAdd(batch []domain.BatchItem) error {
 			pgErr := &pgconn.PgError{}
 			ok := errors.As(err, &pgErr)
 			if ok && pgErr.Code == pgerrcode.UniqueViolation {
-				return domain.ErrURLAlreadyExists
+				var existKey string
+				err := r.conn.QueryRow(context.Background(), "SELECT key FROM urls WHERE url = $1 LIMIT 1", item.URL.String()).Scan(&existKey)
+				if err != nil {
+					return err
+				}
+				return &domain.ErrURLAlreadyExists{HashKey: existKey}
 			}
 			return err
 		}
@@ -49,7 +54,12 @@ func (r *PgURLRepository) Add(key domain.HashKey, u url.URL) error {
 		pgErr := &pgconn.PgError{}
 		ok := errors.As(err, &pgErr)
 		if ok && pgErr.Code == pgerrcode.UniqueViolation {
-			return domain.ErrURLAlreadyExists
+			var existKey string
+			err := r.conn.QueryRow(context.Background(), "SELECT key FROM urls WHERE url = $1 LIMIT 1", u.String()).Scan(&existKey)
+			if err != nil {
+				return err
+			}
+			return &domain.ErrURLAlreadyExists{HashKey: existKey}
 		}
 	}
 

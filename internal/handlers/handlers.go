@@ -48,8 +48,10 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 	}
 	key := r.genShortURLToken()
 	err = r.urlRepo.Add(key, *originURL)
-	if errors.Is(err, domain.ErrURLAlreadyExists) {
+	var dupErr *domain.ErrURLAlreadyExists
+	if errors.As(err, &dupErr) {
 		writer.WriteHeader(http.StatusConflict)
+		_, _ = writer.Write([]byte(createPublicURL(dupErr.HashKey)))
 		return
 	}
 	if err != nil {
@@ -59,7 +61,6 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 	}
 
 	writer.WriteHeader(http.StatusCreated)
-
 	_, _ = writer.Write([]byte(createPublicURL(key)))
 }
 
@@ -101,10 +102,17 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 
 	key := r.genShortURLToken()
 	err = r.urlRepo.Add(key, *originURL)
-	if errors.Is(err, domain.ErrURLAlreadyExists) {
+	var dupErr *domain.ErrURLAlreadyExists
+	if errors.As(err, &dupErr) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
+		err = json.NewEncoder(w).Encode(ShortenResponse{Result: createPublicURL(dupErr.HashKey)})
+		if err != nil {
+			r.logger.Debug("cannot encode response JSON", zap.Error(err))
+		}
 		return
 	}
+
 	if err != nil {
 		r.logger.Debug("cannot add url", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -160,7 +168,8 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 	}
 
 	err = r.urlRepo.BatchAdd(originURLs)
-	if errors.Is(err, domain.ErrURLAlreadyExists) {
+	var dupErr *domain.ErrURLAlreadyExists
+	if errors.As(err, &dupErr) {
 		w.WriteHeader(http.StatusConflict)
 		return
 	}

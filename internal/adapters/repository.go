@@ -38,10 +38,6 @@ func NewMemURLRepository() domain.URLRepository {
 func (m *memURLRepository) Add(key domain.HashKey, u url.URL) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	//_, ok := m.urlStore[key]
-	//if ok {
-	//	return domain.ErrURLAlreadyExists
-	//}
 	m.urlStore[key] = u
 	return nil
 }
