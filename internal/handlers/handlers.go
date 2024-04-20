@@ -47,7 +47,7 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 		return
 	}
 	key := r.genShortURLToken()
-	err = r.urlRepo.Add(key, *originURL)
+	err = r.urlRepo.Add(context.Background(), key, *originURL)
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		writer.WriteHeader(http.StatusConflict)
@@ -70,9 +70,14 @@ func createPublicURL(key domain.HashKey) string {
 
 func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http.Request) {
 	hashkey := chi.URLParam(request, "hash")
-	originURL, ok := r.urlRepo.GetByHash(hashkey)
-	if !ok {
-		http.Error(writer, "Short url not found", http.StatusNotFound)
+	originURL, err := r.urlRepo.GetByHash(context.Background(), hashkey)
+	if err != nil {
+		r.logger.Debug("cannot get url by hash", zap.Error(err))
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if originURL == nil {
+		http.Error(writer, "short url not found", http.StatusNotFound)
 		return
 	}
 	http.Redirect(writer, request, originURL.String(), http.StatusTemporaryRedirect)
@@ -101,7 +106,7 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	}
 
 	key := r.genShortURLToken()
-	err = r.urlRepo.Add(key, *originURL)
+	err = r.urlRepo.Add(context.Background(), key, *originURL)
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.Header().Set("Content-Type", "application/json")
@@ -167,7 +172,7 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 		})
 	}
 
-	err = r.urlRepo.BatchAdd(originURLs)
+	err = r.urlRepo.BatchAdd(context.Background(), originURLs)
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.WriteHeader(http.StatusConflict)
