@@ -5,9 +5,9 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"github.com/jackc/pgx/v5"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/infra"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
@@ -30,11 +30,11 @@ func TestIteration2(t *testing.T) {
 		urlRepo := adapters.NewMemURLRepository()
 
 		if internal.Config.DatabaseDSN != "" {
-			conn, err := pgx.Connect(context.Background(), internal.Config.DatabaseDSN)
-			if err != nil {
-				panic(err)
-			}
-			_, _ = conn.Exec(context.Background(), "TRUNCATE TABLE urls")
+			conn := infra.CreatePgxConn()
+			//nolint:errcheck
+			defer conn.Close(context.Background())
+			_, err := conn.Exec(context.Background(), "TRUNCATE TABLE urls")
+			require.NoError(t, err)
 			urlRepo = adapters.NewPgURLRepository(conn)
 		}
 

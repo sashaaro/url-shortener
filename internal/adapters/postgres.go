@@ -82,9 +82,5 @@ func NewPgURLRepository(conn *pgx.Conn) *PgURLRepository {
 	repo := &PgURLRepository{
 		conn: conn,
 	}
-	_, err := conn.Exec(context.Background(), "CREATE TABLE IF NOT EXISTS urls (key text PRIMARY KEY, url text UNIQUE)")
-	if err != nil {
-		panic(err)
-	}
 	return repo
 }
