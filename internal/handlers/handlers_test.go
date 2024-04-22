@@ -3,9 +3,11 @@ package handlers
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/infra"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
@@ -20,13 +22,23 @@ func TestIteration2(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 
+	internal.InitConfig()
+
 	logger := adapters.CreateLogger()
 
 	t.Run("create short url, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(
-			adapters.NewMemURLRepository(),
-			logger,
-		))
+		urlRepo := adapters.NewMemURLRepository()
+
+		if internal.Config.DatabaseDSN != "" {
+			conn := infra.CreatePgxConn()
+			//nolint:errcheck
+			defer conn.Close(context.Background())
+			_, err := conn.Exec(context.Background(), "TRUNCATE TABLE urls")
+			require.NoError(t, err)
+			urlRepo = adapters.NewPgURLRepository(conn)
+		}
+
+		testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
 		resp, err := httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
@@ -44,14 +56,23 @@ func TestIteration2(t *testing.T) {
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
 		require.Equal(t, "https://github.com", resp.Header.Get("Location"))
+
+		resp, err = httpClient.Get(testServer.URL + "/NoExistShortUrl")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+		if internal.Config.DatabaseDSN != "" { // check unique key for database
+			resp, err = httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusConflict, resp.StatusCode)
+		}
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
 		urlRepo := adapters.NewMemURLRepository()
-		testServer := httptest.NewServer(CreateServeMux(
-			adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger),
-			logger,
-		))
+		testServer := httptest.NewServer(CreateServeMux(adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger), logger, nil))
 		//defer urlRepo.Close()
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL

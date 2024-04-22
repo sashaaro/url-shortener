@@ -4,11 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/caarlos0/env/v6"
+	"strings"
 )
 
 func InitConfig() {
 	serverAddress := flag.String("a", "", "listen address")
 	baseURL := flag.String("b", "", "base url")
+	databaseDSN := flag.String("d", "", "database dsn")
+
 	fileStoragePath := flag.String("f", "/tmp/short-url-db.json", "file path")
 
 	flag.Parse()
@@ -32,4 +35,10 @@ func InitConfig() {
 	if Config.BaseURL == "" {
 		Config.BaseURL = "http://localhost:8080"
 	}
+
+	if Config.DatabaseDSN == "" {
+		Config.DatabaseDSN = *databaseDSN
+	}
+
+	Config.DatabaseDSN = strings.TrimSpace(Config.DatabaseDSN)
 }

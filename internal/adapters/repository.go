@@ -1,22 +1,36 @@
 package adapters
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/google/uuid"
-	"github.com/sashaaro/url-shortener/internal/domain"
-	"go.uber.org/zap"
 	"io"
 	"log"
 	"net/url"
 	"os"
 	"sync"
+
+	"github.com/google/uuid"
+	"github.com/sashaaro/url-shortener/internal/domain"
+	"go.uber.org/zap"
 )
 
-var _ domain.URLRepository = &memURLRepository{}
+var _ domain.URLRepository = &memURLRepository{
+	urlStore: map[string]url.URL{},
+}
 
 type memURLRepository struct {
 	mx       sync.Mutex
 	urlStore map[domain.HashKey]url.URL
+}
+
+func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem) error {
+	for _, item := range batch {
+		err := m.Add(ctx, item.HashKey, item.URL)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func NewMemURLRepository() domain.URLRepository {
@@ -25,17 +39,22 @@ func NewMemURLRepository() domain.URLRepository {
 	}
 }
 
-func (m *memURLRepository) Add(key domain.HashKey, u url.URL) {
+func (m *memURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	m.urlStore[key] = u
+	return nil
 }
 
-func (m *memURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {
+func (m *memURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	u, ok := m.urlStore[key]
-	return u, ok
+	if ok {
+		return &u, nil
+	} else {
+		return nil, nil
+	}
 }
 
 var _ domain.URLRepository = &FileURLRepository{}
@@ -77,6 +96,16 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
+func (f *FileURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem) error {
+	for _, item := range batch {
+		err := f.Add(ctx, item.HashKey, item.URL)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (f *FileURLRepository) load() error {
 	decoder := json.NewDecoder(f.file)
 	var entry fileEntry
@@ -93,7 +122,10 @@ func (f *FileURLRepository) load() error {
 			f.logger.Warn("invalid db url entry")
 			continue
 		}
-		f.wrapped.Add(entry.ShortURL, *u)
+		err = f.wrapped.Add(context.Background(), entry.ShortURL, *u)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -102,18 +134,19 @@ func (f *FileURLRepository) Close() error {
 	return f.file.Close()
 }
 
-func (f FileURLRepository) Add(key domain.HashKey, u url.URL) {
-	err := f.encoder.Encode(fileEntry{
+func (f FileURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL) error {
+	err := f.wrapped.Add(ctx, key, u)
+	if err != nil {
+		return err
+	}
+	err = f.encoder.Encode(fileEntry{
 		ID:          uuid.New(),
 		ShortURL:    key,
 		OriginalURL: u.String(),
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	f.wrapped.Add(key, u)
+	return err
 }
 
-func (f FileURLRepository) GetByHash(key domain.HashKey) (url.URL, bool) {
-	return f.wrapped.GetByHash(key)
+func (f FileURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
+	return f.wrapped.GetByHash(ctx, key)
 }
