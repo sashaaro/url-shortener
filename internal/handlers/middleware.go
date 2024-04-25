@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"compress/gzip"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/sashaaro/url-shortener/internal"
@@ -15,7 +16,7 @@ import (
 
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID uuid.UUID
+	UserID uuid.UUID `json:"user_id,omitempty"`
 }
 
 func WithLogging(logger zap.SugaredLogger, h http.HandlerFunc) http.HandlerFunc {
@@ -161,7 +162,7 @@ func BuildJWTString(secretKey string, userID uuid.UUID) (string, error) {
 	return tokenString, nil
 }
 
-func GetUserID(secretKey string, tokenStr string) (uuid.UUID, error) {
+func fetchUserIDFromToken(secretKey string, tokenStr string) (uuid.UUID, error) {
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims,
 		func(t *jwt.Token) (interface{}, error) {
@@ -185,40 +186,49 @@ func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 			accessToken = authCookie.Value
 		}
 
+		authHeader := r.Header.Get("Authorization")
+		if accessToken == "" && authHeader != "" {
+			accessToken = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+
 		if accessToken != "" {
 			var err error
-			userID, err = GetUserID(internal.Config.JwtSecret, accessToken)
+			userID, err = fetchUserIDFromToken(internal.Config.JwtSecret, accessToken)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte("invalid access token"))
 				return
 			}
 		}
 		if userID == uuid.Nil {
 			if authRequired {
 				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte("Unauthorized"))
+				_, _ = w.Write([]byte("Unauthorized"))
 				return
 			}
 			userID = uuid.New()
 		}
 
-		h.ServeHTTP(w, r.WithContext(adapters.UserIDToCxt(r.Context(), userID)))
-
 		if accessToken == "" {
-			newToken, err := BuildJWTString(internal.Config.JwtSecret, userID)
+			var err error
+			accessToken, err = BuildJWTString(internal.Config.JwtSecret, userID)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			http.SetCookie(w, &http.Cookie{
-				Name:     "access_token",
-				Value:    newToken,
-				Path:     "/",
-				Domain:   "*",
-				Expires:  time.Now().Add(JwtTTL),
-				Secure:   true,
-				HttpOnly: true,
-			})
 		}
+
+		w.Header().Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+		http.SetCookie(w, &http.Cookie{
+			Name:     "access_token",
+			Value:    accessToken,
+			Path:     "/",
+			Domain:   "*",
+			Expires:  time.Now().Add(JwtTTL),
+			Secure:   true,
+			HttpOnly: true,
+		})
+
+		h.ServeHTTP(w, r.WithContext(adapters.UserIDToCxt(r.Context(), userID)))
 	}
 }

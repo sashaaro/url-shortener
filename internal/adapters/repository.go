@@ -35,14 +35,9 @@ func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]d
 	defer m.mx.Unlock()
 	for _, v := range m.urlStore {
 		if v.userID == userID {
-			shortURL, err := url.Parse(CreatePublicURL(v.hash))
-			if err != nil {
-				return nil, err
-			}
-
 			l = append(l, domain.URLEntry{
-				ShortURL:    *shortURL,
-				OriginalURL: v.url,
+				ShortURL:    CreatePublicURL(v.hash),
+				OriginalURL: v.url.String(),
 			})
 		}
 	}

@@ -93,6 +93,8 @@ func TestIteration2(t *testing.T) {
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
 		require.Equal(t, "https://yandex.ru", resp.Header.Get("Location"))
+		require.NotEmpty(t, resp.Header.Get("Authorization"))
+		authorization := resp.Header.Get("Authorization")
 
 		var buf bytes.Buffer
 		g := gzip.NewWriter(&buf)
@@ -104,10 +106,19 @@ func TestIteration2(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", authorization)
 
 		resp, err = httpClient.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		req, err = http.NewRequest("GET", testServer.URL+"/api/user/urls", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", authorization)
+		resp, err = httpClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 	})
 }

@@ -30,20 +30,12 @@ func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]do
 	urls := []domain.URLEntry{}
 	var key, u string
 	for rows.Next() {
-		if err := rows.Scan(&key, &u); err != nil {
-			return nil, err
-		}
-		shortURL, err := url.Parse(CreatePublicURL(key))
-		if err != nil {
-			return nil, err
-		}
-		originalURL, err := url.Parse(u)
-		if err != nil {
+		if err = rows.Scan(&key, &u); err != nil {
 			return nil, err
 		}
 		urls = append(urls, domain.URLEntry{
-			ShortURL:    *shortURL,
-			OriginalURL: *originalURL,
+			ShortURL:    CreatePublicURL(key),
+			OriginalURL: u,
 		})
 	}
 	return urls, nil

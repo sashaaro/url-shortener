@@ -14,7 +14,7 @@ func UserIDFromReq(req *http.Request) (uuid.UUID, error) {
 	return UserIDFromCtx(req.Context())
 }
 func MustUserIDFromReq(req *http.Request) uuid.UUID {
-	return utils.Must(UserIDFromCtx(req.Context()))
+	return utils.Must(UserIDFromReq(req))
 }
 
 func UserIDFromCtx(ctx context.Context) (uuid.UUID, error) {
