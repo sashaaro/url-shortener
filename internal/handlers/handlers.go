@@ -225,11 +225,11 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn
 	r.Use(middleware.Logger)
 	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger, conn)
 
-	r.Post("/", WithAuth(gzipHandle(WithLogging(logger, handlers.createShortHandler))))
-	r.Get("/{hash}", WithAuth(gzipHandle(WithLogging(logger, handlers.getShortHandler))))
-	r.Post("/api/shorten", WithAuth(gzipHandle(WithLogging(logger, handlers.shorten))))
-	r.Post("/api/shorten/batch", WithAuth(gzipHandle(WithLogging(logger, handlers.batchShorten))))
-	r.Get("/api/user/urls", WithAuth(gzipHandle(WithLogging(logger, handlers.getMyUrls))))
+	r.Post("/", WithAuth(false, gzipHandle(WithLogging(logger, handlers.createShortHandler))))
+	r.Get("/{hash}", WithAuth(false, gzipHandle(WithLogging(logger, handlers.getShortHandler))))
+	r.Post("/api/shorten", WithAuth(false, gzipHandle(WithLogging(logger, handlers.shorten))))
+	r.Post("/api/shorten/batch", WithAuth(false, gzipHandle(WithLogging(logger, handlers.batchShorten))))
+	r.Get("/api/user/urls", WithAuth(true, gzipHandle(WithLogging(logger, handlers.getMyUrls))))
 	r.Get("/ping", handlers.ping)
 
 	return r

@@ -174,7 +174,7 @@ func GetUserID(secretKey string, tokenStr string) (uuid.UUID, error) {
 	return claims.UserID, nil
 }
 
-func WithAuth(h http.HandlerFunc) http.HandlerFunc {
+func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authCookie, _ := r.Cookie("access_token")
 
@@ -194,6 +194,11 @@ func WithAuth(h http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		if userID == uuid.Nil {
+			if authRequired {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("Unauthorized"))
+				return
+			}
 			userID = uuid.New()
 		}
 
