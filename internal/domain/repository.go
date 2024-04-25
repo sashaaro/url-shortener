@@ -14,9 +14,9 @@ type BatchItem struct {
 	URL     url.URL
 }
 
-type UrlEntry struct {
-	ShortUrl    url.URL `json:"short_url"`
-	OriginalUrl url.URL `json:"original_url"`
+type URLEntry struct {
+	ShortURL    url.URL `json:"short_url"`
+	OriginalURL url.URL `json:"original_url"`
 }
 
 type ErrURLAlreadyExists struct {
@@ -33,7 +33,7 @@ type URLRepository interface {
 	Add(ctx context.Context, key HashKey, u url.URL, userID uuid.UUID) error
 	BatchAdd(ctx context.Context, batch []BatchItem, userID uuid.UUID) error
 	GetByHash(ctx context.Context, key HashKey) (*url.URL, error)
-	GetByUser(ctx context.Context, userID uuid.UUID) ([]UrlEntry, error)
+	GetByUser(ctx context.Context, userID uuid.UUID) ([]URLEntry, error)
 }
 
 type GenShortURLToken = func() HashKey

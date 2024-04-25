@@ -29,20 +29,20 @@ type memURLRepository struct {
 	urlStore map[domain.HashKey]memEntry
 }
 
-func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.UrlEntry, error) {
-	l := make([]domain.UrlEntry, 0)
+func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
+	l := make([]domain.URLEntry, 0)
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	for _, v := range m.urlStore {
 		if v.userID == userID {
-			shortUrl, err := url.Parse(CreatePublicURL(v.hash))
+			shortURL, err := url.Parse(CreatePublicURL(v.hash))
 			if err != nil {
 				return nil, err
 			}
 
-			l = append(l, domain.UrlEntry{
-				ShortUrl:    *shortUrl,
-				OriginalUrl: v.url,
+			l = append(l, domain.URLEntry{
+				ShortURL:    *shortURL,
+				OriginalURL: v.url,
 			})
 		}
 	}
@@ -127,7 +127,7 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
-func (f *FileURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.UrlEntry, error) {
+func (f *FileURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	return f.wrapped.GetByUser(ctx, userID)
 }
 

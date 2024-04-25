@@ -7,15 +7,15 @@ import (
 )
 
 func init() {
-	goose.AddMigrationContext(upAddColumnUserId, downAddColumnUserId)
+	goose.AddMigrationContext(upAddColumnUserID, downAddColumnUserID)
 }
 
-func upAddColumnUserId(ctx context.Context, tx *sql.Tx) error {
+func upAddColumnUserID(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, "ALTER TABLE urls ADD COLUMN user_id uuid not null")
 	return err
 }
 
-func downAddColumnUserId(ctx context.Context, tx *sql.Tx) error {
+func downAddColumnUserID(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, "ALTER TABLE urls DROP COLUMN user_id")
 	return err
 }

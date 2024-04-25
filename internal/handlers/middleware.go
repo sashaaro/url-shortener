@@ -161,7 +161,7 @@ func BuildJWTString(secretKey string, userID uuid.UUID) (string, error) {
 	return tokenString, nil
 }
 
-func GetUserId(secretKey string, tokenStr string) (uuid.UUID, error) {
+func GetUserID(secretKey string, tokenStr string) (uuid.UUID, error) {
 	claims := &Claims{}
 	_, err := jwt.ParseWithClaims(tokenStr, claims,
 		func(t *jwt.Token) (interface{}, error) {
@@ -187,7 +187,7 @@ func WithAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		if accessToken != "" {
 			var err error
-			userID, err = GetUserId(internal.Config.JwtSecret, accessToken)
+			userID, err = GetUserID(internal.Config.JwtSecret, accessToken)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return

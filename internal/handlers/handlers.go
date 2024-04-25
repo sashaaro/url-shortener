@@ -213,7 +213,7 @@ func (r *HTTPHandlers) getMyUrls(w http.ResponseWriter, request *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(list)
 	if err != nil {
 		r.logger.Debug("cannot encode response JSON", zap.Error(err))

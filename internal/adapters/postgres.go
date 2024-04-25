@@ -17,7 +17,7 @@ type PgURLRepository struct {
 	conn *pgx.Conn
 }
 
-func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.UrlEntry, error) {
+func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	rows, err := r.conn.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -27,23 +27,23 @@ func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]do
 	}
 	defer rows.Close()
 
-	urls := []domain.UrlEntry{}
+	urls := []domain.URLEntry{}
 	var key, u string
 	for rows.Next() {
 		if err := rows.Scan(&key, &u); err != nil {
 			return nil, err
 		}
-		shortUrl, err := url.Parse(CreatePublicURL(key))
+		shortURL, err := url.Parse(CreatePublicURL(key))
 		if err != nil {
 			return nil, err
 		}
-		originalUrl, err := url.Parse(u)
+		originalURL, err := url.Parse(u)
 		if err != nil {
 			return nil, err
 		}
-		urls = append(urls, domain.UrlEntry{
-			ShortUrl:    *shortUrl,
-			OriginalUrl: *originalUrl,
+		urls = append(urls, domain.URLEntry{
+			ShortURL:    *shortURL,
+			OriginalURL: *originalURL,
 		})
 	}
 	return urls, nil
@@ -58,7 +58,7 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	defer tx.Rollback(ctx)
 
 	for _, item := range batch {
-		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID)
+		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID)
 		if err != nil {
 			pgErr := &pgconn.PgError{}
 			ok := errors.As(err, &pgErr)
