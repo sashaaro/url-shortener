@@ -2,13 +2,11 @@ package handlers
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5"
-	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"go.uber.org/zap"
@@ -47,11 +45,11 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 		return
 	}
 	key := r.genShortURLToken()
-	err = r.urlRepo.Add(context.Background(), key, *originURL)
+	err = r.urlRepo.Add(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		writer.WriteHeader(http.StatusConflict)
-		_, _ = writer.Write([]byte(createPublicURL(dupErr.HashKey)))
+		_, _ = writer.Write([]byte(adapters.CreatePublicURL(dupErr.HashKey)))
 		return
 	}
 	if err != nil {
@@ -61,16 +59,12 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 	}
 
 	writer.WriteHeader(http.StatusCreated)
-	_, _ = writer.Write([]byte(createPublicURL(key)))
-}
-
-func createPublicURL(key domain.HashKey) string {
-	return internal.Config.BaseURL + "/" + key
+	_, _ = writer.Write([]byte(adapters.CreatePublicURL(key)))
 }
 
 func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http.Request) {
 	hashkey := chi.URLParam(request, "hash")
-	originURL, err := r.urlRepo.GetByHash(context.Background(), hashkey)
+	originURL, err := r.urlRepo.GetByHash(request.Context(), hashkey)
 	if err != nil {
 		r.logger.Debug("cannot get url by hash", zap.Error(err))
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -106,12 +100,12 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	}
 
 	key := r.genShortURLToken()
-	err = r.urlRepo.Add(context.Background(), key, *originURL)
+	err = r.urlRepo.Add(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
-		err = json.NewEncoder(w).Encode(ShortenResponse{Result: createPublicURL(dupErr.HashKey)})
+		err = json.NewEncoder(w).Encode(ShortenResponse{Result: adapters.CreatePublicURL(dupErr.HashKey)})
 		if err != nil {
 			r.logger.Debug("cannot encode response JSON", zap.Error(err))
 		}
@@ -126,7 +120,7 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(ShortenResponse{Result: createPublicURL(key)})
+	err = json.NewEncoder(w).Encode(ShortenResponse{Result: adapters.CreatePublicURL(key)})
 	if err != nil {
 		r.logger.Debug("cannot encode response JSON", zap.Error(err))
 	}
@@ -172,7 +166,7 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 		})
 	}
 
-	err = r.urlRepo.BatchAdd(context.Background(), originURLs)
+	err = r.urlRepo.BatchAdd(request.Context(), originURLs, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.WriteHeader(http.StatusConflict)
@@ -188,7 +182,7 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 	for i, item := range originURLs {
 		resp = append(resp, ShortenItemRes{
 			CorrelationID: req[i].CorrelationID,
-			ShortURL:      createPublicURL(item.HashKey),
+			ShortURL:      adapters.CreatePublicURL(item.HashKey),
 		})
 	}
 
@@ -202,11 +196,27 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 }
 
 func (r *HTTPHandlers) ping(w http.ResponseWriter, request *http.Request) {
-	err := r.conn.Ping(context.Background())
+	err := r.conn.Ping(request.Context())
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (r *HTTPHandlers) getMyUrls(w http.ResponseWriter, request *http.Request) {
+	list, err := r.urlRepo.GetByUser(request.Context(), adapters.MustUserIDFromReq(request))
+	if err != nil {
+		r.logger.Debug("cannot get urls", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	err = json.NewEncoder(w).Encode(list)
+	if err != nil {
+		r.logger.Debug("cannot encode response JSON", zap.Error(err))
 	}
 }
 
@@ -219,6 +229,7 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn
 	r.Get("/{hash}", WithAuth(gzipHandle(WithLogging(logger, handlers.getShortHandler))))
 	r.Post("/api/shorten", WithAuth(gzipHandle(WithLogging(logger, handlers.shorten))))
 	r.Post("/api/shorten/batch", WithAuth(gzipHandle(WithLogging(logger, handlers.batchShorten))))
+	r.Get("/api/user/urls", WithAuth(gzipHandle(WithLogging(logger, handlers.getMyUrls))))
 	r.Get("/ping", handlers.ping)
 
 	return r

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/domain"
 )
 
@@ -16,4 +17,8 @@ func GenBase64ShortURLToken() domain.HashKey {
 		panic(fmt.Errorf("error while retriving random data: %d %v", n, err.Error()))
 	}
 	return base64.URLEncoding.EncodeToString(buf)[:length]
+}
+
+func CreatePublicURL(key domain.HashKey) string {
+	return internal.Config.BaseURL + "/" + key
 }

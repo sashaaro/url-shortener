@@ -71,7 +71,7 @@ func TestIteration2(t *testing.T) {
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
-		testServer := httptest.NewServer(CreateServeMux(adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger), logger, nil))
+		testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
 		//defer urlRepo.Close()
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
@@ -96,7 +96,7 @@ func TestIteration2(t *testing.T) {
 
 		var buf bytes.Buffer
 		g := gzip.NewWriter(&buf)
-		_, err = g.Write([]byte(`{"url": "https://yandex.ru"}`))
+		_, err = g.Write([]byte(`{"url": "https://rambler.ru"}`))
 		require.NoError(t, err)
 		g.Close()
 

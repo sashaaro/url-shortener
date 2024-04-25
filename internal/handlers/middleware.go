@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"compress/gzip"
-	"context"
-	"errors"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/sashaaro/url-shortener/internal"
+	"github.com/sashaaro/url-shortener/internal/adapters"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -175,20 +174,6 @@ func GetUserId(secretKey string, tokenStr string) (uuid.UUID, error) {
 	return claims.UserID, nil
 }
 
-type UserContext struct{}
-
-func UserIDFromContext(ctx context.Context) (int, error) {
-	userID, ok := ctx.Value(UserContext{}).(int)
-	if !ok {
-		return 0, errors.New("user id not found")
-	}
-	return userID, nil
-}
-
-func UserIDToContext(ctx context.Context, userID uuid.UUID) context.Context {
-	return context.WithValue(ctx, UserContext{}, userID)
-}
-
 func WithAuth(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authCookie, _ := r.Cookie("access_token")
@@ -203,19 +188,16 @@ func WithAuth(h http.HandlerFunc) http.HandlerFunc {
 		if accessToken != "" {
 			var err error
 			userID, err = GetUserId(internal.Config.JwtSecret, accessToken)
-			if err == nil {
-				r.WithContext(UserIDToContext(r.Context(), userID))
-			} else {
+			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		}
 		if userID == uuid.Nil {
 			userID = uuid.New()
-			r.WithContext(UserIDToContext(r.Context(), userID))
 		}
 
-		h.ServeHTTP(w, r)
+		h.ServeHTTP(w, r.WithContext(adapters.UserIDToCxt(r.Context(), userID)))
 
 		if accessToken == "" {
 			newToken, err := BuildJWTString(internal.Config.JwtSecret, userID)
