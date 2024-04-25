@@ -12,6 +12,11 @@ func init() {
 
 func upAddColumnUserID(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, "ALTER TABLE urls ADD COLUMN user_id uuid not null")
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, "CREATE INDEX urls_user_id_idx ON urls (user_id)")
 	return err
 }
 
