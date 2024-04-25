@@ -41,4 +41,8 @@ func InitConfig() {
 	}
 
 	Config.DatabaseDSN = strings.TrimSpace(Config.DatabaseDSN)
+
+	if Config.JwtSecret == "" {
+		Config.JwtSecret = "secret"
+	}
 }

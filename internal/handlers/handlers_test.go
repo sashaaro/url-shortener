@@ -26,18 +26,18 @@ func TestIteration2(t *testing.T) {
 
 	logger := adapters.CreateLogger()
 
+	urlRepo := adapters.NewMemURLRepository()
+
+	if internal.Config.DatabaseDSN != "" {
+		conn := infra.CreatePgxConn()
+		//nolint:errcheck
+		defer conn.Close(context.Background())
+		_, err := conn.Exec(context.Background(), "TRUNCATE TABLE urls")
+		require.NoError(t, err)
+		urlRepo = adapters.NewPgURLRepository(conn)
+	}
+
 	t.Run("create short url, pass through short url", func(t *testing.T) {
-		urlRepo := adapters.NewMemURLRepository()
-
-		if internal.Config.DatabaseDSN != "" {
-			conn := infra.CreatePgxConn()
-			//nolint:errcheck
-			defer conn.Close(context.Background())
-			_, err := conn.Exec(context.Background(), "TRUNCATE TABLE urls")
-			require.NoError(t, err)
-			urlRepo = adapters.NewPgURLRepository(conn)
-		}
-
 		testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
 		defer testServer.Close()
 		internal.Config.BaseURL = testServer.URL
@@ -71,7 +71,6 @@ func TestIteration2(t *testing.T) {
 	})
 
 	t.Run("create short url use POST /shorten, pass through short url", func(t *testing.T) {
-		urlRepo := adapters.NewMemURLRepository()
 		testServer := httptest.NewServer(CreateServeMux(adapters.NewFileURLRepository("/tmp/short-url-db.json", urlRepo, logger), logger, nil))
 		//defer urlRepo.Close()
 		defer testServer.Close()

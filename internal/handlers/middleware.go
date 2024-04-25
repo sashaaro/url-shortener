@@ -2,12 +2,22 @@ package handlers
 
 import (
 	"compress/gzip"
+	"context"
+	"errors"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/sashaaro/url-shortener/internal"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 )
+
+type Claims struct {
+	jwt.RegisteredClaims
+	UserID uuid.UUID
+}
 
 func WithLogging(logger zap.SugaredLogger, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,4 +137,101 @@ func (c *compressReader) Close() error {
 		return err
 	}
 	return c.zr.Close()
+}
+
+const JwtTTL = 15 * time.Minute
+
+func BuildJWTString(secretKey string, userID uuid.UUID) (string, error) {
+	// создаём новый токен с алгоритмом подписи HS256 и утверждениями — Claims
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			// когда создан токен
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(JwtTTL)),
+		},
+		// собственное утверждение
+		UserID: userID,
+	})
+
+	// создаём строку токена
+	tokenString, err := token.SignedString([]byte(secretKey))
+	if err != nil {
+		return "", err
+	}
+
+	// возвращаем строку токена
+	return tokenString, nil
+}
+
+func GetUserId(secretKey string, tokenStr string) (uuid.UUID, error) {
+	claims := &Claims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims,
+		func(t *jwt.Token) (interface{}, error) {
+			return []byte(secretKey), nil
+		})
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return claims.UserID, nil
+}
+
+type UserContext struct{}
+
+func UserIDFromContext(ctx context.Context) (int, error) {
+	userID, ok := ctx.Value(UserContext{}).(int)
+	if !ok {
+		return 0, errors.New("user id not found")
+	}
+	return userID, nil
+}
+
+func UserIDToContext(ctx context.Context, userID uuid.UUID) context.Context {
+	return context.WithValue(ctx, UserContext{}, userID)
+}
+
+func WithAuth(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authCookie, _ := r.Cookie("access_token")
+
+		var userID uuid.UUID
+		var accessToken string
+
+		if authCookie != nil && authCookie.Value != "" {
+			accessToken = authCookie.Value
+		}
+
+		if accessToken != "" {
+			var err error
+			userID, err = GetUserId(internal.Config.JwtSecret, accessToken)
+			if err == nil {
+				r.WithContext(UserIDToContext(r.Context(), userID))
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+		if userID == uuid.Nil {
+			userID = uuid.New()
+			r.WithContext(UserIDToContext(r.Context(), userID))
+		}
+
+		h.ServeHTTP(w, r)
+
+		if accessToken == "" {
+			newToken, err := BuildJWTString(internal.Config.JwtSecret, userID)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			http.SetCookie(w, &http.Cookie{
+				Name:     "access_token",
+				Value:    newToken,
+				Path:     "/",
+				Domain:   "*",
+				Expires:  time.Now().Add(JwtTTL),
+				Secure:   true,
+				HttpOnly: true,
+			})
+		}
+	}
 }
