@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/caarlos0/env/v6"
+	"log"
+	"net/url"
 	"strings"
 )
 
@@ -34,6 +36,11 @@ func InitConfig() {
 	}
 	if Config.BaseURL == "" {
 		Config.BaseURL = "http://localhost:8080"
+	}
+
+	_, err := url.Parse(Config.BaseURL)
+	if err != nil {
+		log.Fatal("invalid base url: ", err)
 	}
 
 	if Config.DatabaseDSN == "" {

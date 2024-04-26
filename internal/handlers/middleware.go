@@ -7,9 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/utils"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -176,6 +178,7 @@ func fetchUserIDFromToken(secretKey string, tokenStr string) (uuid.UUID, error) 
 }
 
 func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
+	hostname := utils.Must(url.Parse(internal.Config.BaseURL)).Hostname()
 	return func(w http.ResponseWriter, r *http.Request) {
 		authCookie, _ := r.Cookie("access_token")
 
@@ -223,7 +226,7 @@ func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 			Name:     "access_token",
 			Value:    accessToken,
 			Path:     "/",
-			Domain:   "*",
+			Domain:   hostname,
 			Expires:  time.Now().Add(JwtTTL),
 			Secure:   true,
 			HttpOnly: true,
