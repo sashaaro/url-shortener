@@ -17,6 +17,12 @@ type PgURLRepository struct {
 	conn *pgx.Conn
 }
 
+func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
+	_, err := r.conn.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1) AND user_id = $2", keys, userID)
+
+	return err
+}
+
 func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	rows, err := r.conn.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
@@ -93,12 +99,16 @@ func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL
 
 func (r *PgURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	var res string
-	err := r.conn.QueryRow(ctx, "SELECT url FROM urls WHERE key = $1", key).Scan(&res)
+	var isDeleted bool
+	err := r.conn.QueryRow(ctx, "SELECT url, is_deleted FROM urls WHERE key = $1", key).Scan(&res, &isDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if isDeleted {
+		return nil, domain.ErrURLDeleted
 	}
 	return url.Parse(res)
 }

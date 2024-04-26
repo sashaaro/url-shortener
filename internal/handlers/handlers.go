@@ -65,6 +65,10 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http.Request) {
 	hashkey := chi.URLParam(request, "hash")
 	originURL, err := r.urlRepo.GetByHash(request.Context(), hashkey)
+	if errors.Is(err, domain.ErrURLDeleted) {
+		writer.WriteHeader(http.StatusGone)
+		return
+	}
 	if err != nil {
 		r.logger.Debug("cannot get url by hash", zap.Error(err))
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -220,6 +224,26 @@ func (r *HTTPHandlers) getMyUrls(w http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) {
+	keys := []string{}
+	err := json.NewDecoder(request.Body).Decode(&keys)
+	if err != nil {
+		r.logger.Debug("cannot decode request JSON body", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if len(keys) != 0 {
+		err = r.urlRepo.DeleteByUser(request.Context(), keys, adapters.MustUserIDFromReq(request))
+		if err != nil {
+			r.logger.Error("cannot delete urls", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn *pgx.Conn) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -230,6 +254,7 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn
 	r.Post("/api/shorten", WithAuth(false, gzipHandle(WithLogging(logger, handlers.shorten))))
 	r.Post("/api/shorten/batch", WithAuth(false, gzipHandle(WithLogging(logger, handlers.batchShorten))))
 	r.Get("/api/user/urls", WithAuth(true, gzipHandle(WithLogging(logger, handlers.getMyUrls))))
+	r.Delete("/api/user/urls", WithAuth(false, gzipHandle(WithLogging(logger, handlers.deleteUrls))))
 	r.Get("/ping", handlers.ping)
 
 	return r

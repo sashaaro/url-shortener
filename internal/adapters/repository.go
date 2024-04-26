@@ -29,6 +29,17 @@ type memURLRepository struct {
 	urlStore map[domain.HashKey]memEntry
 }
 
+func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	for _, key := range keys {
+		if m.urlStore[key].userID == userID {
+			delete(m.urlStore, key)
+		}
+	}
+	return nil
+}
+
 func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	l := make([]domain.URLEntry, 0)
 	m.mx.Lock()
@@ -120,6 +131,10 @@ type FileURLRepository struct {
 	encoder *json.Encoder
 	wrapped domain.URLRepository
 	logger  zap.SugaredLogger
+}
+
+func (f *FileURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
+	return f.wrapped.DeleteByUser(ctx, keys, userID)
 }
 
 func (f *FileURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {

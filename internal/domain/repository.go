@@ -19,6 +19,8 @@ type URLEntry struct {
 	OriginalURL string `json:"original_url"`
 }
 
+var ErrURLDeleted = fmt.Errorf("url deleted")
+
 type ErrURLAlreadyExists struct {
 	HashKey HashKey
 }
@@ -34,6 +36,7 @@ type URLRepository interface {
 	BatchAdd(ctx context.Context, batch []BatchItem, userID uuid.UUID) error
 	GetByHash(ctx context.Context, key HashKey) (*url.URL, error)
 	GetByUser(ctx context.Context, userID uuid.UUID) ([]URLEntry, error)
+	DeleteByUser(ctx context.Context, keys []HashKey, userID uuid.UUID) error
 }
 
 type GenShortURLToken = func() HashKey
