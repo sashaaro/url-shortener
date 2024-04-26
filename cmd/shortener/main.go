@@ -1,8 +1,7 @@
 package main
 
 import (
-	"context"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
@@ -19,12 +18,12 @@ func main() {
 
 	var urlRepo domain.URLRepository
 
-	var conn *pgx.Conn
+	var pool *pgxpool.Pool
 	if internal.Config.DatabaseDSN != "" {
-		conn = infra.CreatePgxConn()
+		pool = infra.CreatePgxPool()
 		//nolint:errcheck
-		defer conn.Close(context.Background())
-		urlRepo = adapters.NewPgURLRepository(conn)
+		defer pool.Close()
+		urlRepo = adapters.NewPgURLRepository(pool)
 	} else {
 		urlRepo = adapters.NewMemURLRepository()
 		if internal.Config.FileStoragePath != "" {
@@ -32,5 +31,5 @@ func main() {
 		}
 	}
 
-	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger, conn)))
+	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger, pool)))
 }

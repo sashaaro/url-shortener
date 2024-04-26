@@ -2,21 +2,26 @@ package infra
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/sashaaro/url-shortener/internal"
 	_ "github.com/sashaaro/url-shortener/migrations"
+
 	"log"
 )
 
-func CreatePgxConn() *pgx.Conn {
-	conn, err := pgx.Connect(context.Background(), internal.Config.DatabaseDSN)
+func CreatePgxPool() *pgxpool.Pool {
+	config, err := pgxpool.ParseConfig(internal.Config.DatabaseDSN)
+	if err != nil {
+		log.Fatalf("can't parse config: %v", err)
+	}
+
 	if err != nil {
 		log.Fatal("can't connect to database", err)
 	}
 
-	db := stdlib.OpenDB(*conn.Config())
+	db := stdlib.OpenDB(*config.ConnConfig)
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Fatal("can't set dialect: ", err)
@@ -25,5 +30,9 @@ func CreatePgxConn() *pgx.Conn {
 	if err := goose.Up(db, "./"); err != nil {
 		log.Fatal("can't run migrations: ", err)
 	}
-	return conn
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		log.Fatal("can't create pool: ", err)
+	}
+	return pool
 }

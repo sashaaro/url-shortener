@@ -30,12 +30,12 @@ func TestIteration2(t *testing.T) {
 	urlRepo := adapters.NewMemURLRepository()
 
 	if internal.Config.DatabaseDSN != "" {
-		conn := infra.CreatePgxConn()
+		pool := infra.CreatePgxPool()
 		//nolint:errcheck
-		defer conn.Close(context.Background())
-		_, err := conn.Exec(context.Background(), "TRUNCATE TABLE urls")
+		defer pool.Close()
+		_, err := pool.Exec(context.Background(), "TRUNCATE TABLE urls")
 		require.NoError(t, err)
-		urlRepo = adapters.NewPgURLRepository(conn)
+		urlRepo = adapters.NewPgURLRepository(pool)
 	}
 
 	testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))

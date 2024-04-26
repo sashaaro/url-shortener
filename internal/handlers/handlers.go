@@ -6,7 +6,7 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/utils"
@@ -21,15 +21,15 @@ type HTTPHandlers struct {
 	urlRepo          domain.URLRepository
 	genShortURLToken domain.GenShortURLToken
 	logger           zap.SugaredLogger
-	conn             *pgx.Conn
+	pool             *pgxpool.Pool
 }
 
-func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenShortURLToken, logger zap.SugaredLogger, conn *pgx.Conn) *HTTPHandlers {
+func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenShortURLToken, logger zap.SugaredLogger, pool *pgxpool.Pool) *HTTPHandlers {
 	return &HTTPHandlers{
 		urlRepo:          urlRepo,
 		genShortURLToken: genShortURLToken,
 		logger:           logger,
-		conn:             conn,
+		pool:             pool,
 	}
 }
 
@@ -201,7 +201,7 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 }
 
 func (r *HTTPHandlers) ping(w http.ResponseWriter, request *http.Request) {
-	err := r.conn.Ping(request.Context())
+	err := r.pool.Ping(request.Context())
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -249,10 +249,10 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, conn *pgx.Conn) *chi.Mux {
+func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger, conn)
+	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger, pool)
 
 	r.Post("/", WithAuth(false, gzipHandle(WithLogging(logger, handlers.createShortHandler))))
 	r.Get("/{hash}", WithAuth(false, gzipHandle(WithLogging(logger, handlers.getShortHandler))))
