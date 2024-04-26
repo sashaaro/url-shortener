@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
+	"github.com/sashaaro/url-shortener/internal/utils"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -232,11 +233,15 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	keys = utils.Filter(keys, func(key string) bool {
+		return len([]rune(key)) > 0
+	})
 	if len(keys) != 0 {
-		err = r.urlRepo.DeleteByUser(request.Context(), keys, adapters.MustUserIDFromReq(request))
+		_, err = r.urlRepo.DeleteByUser(request.Context(), keys, adapters.MustUserIDFromReq(request))
 		if err != nil {
 			r.logger.Error("cannot delete urls", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte("Cannot delete urls"))
 			return
 		}
 	}

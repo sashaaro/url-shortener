@@ -36,7 +36,7 @@ type URLRepository interface {
 	BatchAdd(ctx context.Context, batch []BatchItem, userID uuid.UUID) error
 	GetByHash(ctx context.Context, key HashKey) (*url.URL, error)
 	GetByUser(ctx context.Context, userID uuid.UUID) ([]URLEntry, error)
-	DeleteByUser(ctx context.Context, keys []HashKey, userID uuid.UUID) error
+	DeleteByUser(ctx context.Context, keys []HashKey, userID uuid.UUID) (bool, error)
 }
 
 type GenShortURLToken = func() HashKey

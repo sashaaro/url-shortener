@@ -17,14 +17,14 @@ type PgURLRepository struct {
 	conn *pgx.Conn
 }
 
-func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
-	_, err := r.conn.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1) AND user_id = $2", keys, userID)
+func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
+	res, err := r.conn.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1) -- AND user_id = $2", keys) //, userID.String())
 
-	return err
+	return res.RowsAffected() == int64(len(keys)), err
 }
 
 func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
-	rows, err := r.conn.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID)
+	rows, err := r.conn.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID.String())
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -56,7 +56,7 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	defer tx.Rollback(ctx)
 
 	for _, item := range batch {
-		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID)
+		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID.String())
 		if err != nil {
 			pgErr := &pgconn.PgError{}
 			ok := errors.As(err, &pgErr)
@@ -80,7 +80,7 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 }
 
 func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
-	_, err := r.conn.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", key, u.String(), userID)
+	_, err := r.conn.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", key, u.String(), userID.String())
 	if err != nil {
 		pgErr := &pgconn.PgError{}
 		ok := errors.As(err, &pgErr)

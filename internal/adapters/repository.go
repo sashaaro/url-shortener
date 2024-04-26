@@ -29,7 +29,7 @@ type memURLRepository struct {
 	urlStore map[domain.HashKey]memEntry
 }
 
-func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
+func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 	for _, key := range keys {
@@ -37,7 +37,7 @@ func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashK
 			delete(m.urlStore, key)
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
@@ -133,7 +133,7 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
-func (f *FileURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) error {
+func (f *FileURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	return f.wrapped.DeleteByUser(ctx, keys, userID)
 }
 
