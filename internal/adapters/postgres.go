@@ -3,9 +3,11 @@ package adapters
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"net/url"
 )
@@ -13,11 +15,41 @@ import (
 var _ domain.URLRepository = &PgURLRepository{}
 
 type PgURLRepository struct {
-	conn *pgx.Conn
+	pool *pgxpool.Pool
 }
 
-func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem) error {
-	tx, err := r.conn.BeginTx(ctx, pgx.TxOptions{})
+func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
+	res, err := r.pool.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1)", keys)
+
+	return res.RowsAffected() == int64(len(keys)), err
+}
+
+func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
+	rows, err := r.pool.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID.String())
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	urls := []domain.URLEntry{}
+	var key, u string
+	for rows.Next() {
+		if err = rows.Scan(&key, &u); err != nil {
+			return nil, err
+		}
+		urls = append(urls, domain.URLEntry{
+			ShortURL:    CreatePublicURL(key),
+			OriginalURL: u,
+		})
+	}
+	return urls, nil
+}
+
+func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
 	}
@@ -25,13 +57,13 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	defer tx.Rollback(ctx)
 
 	for _, item := range batch {
-		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url) VALUES ($1, $2)", item.HashKey, item.URL.String())
+		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID.String())
 		if err != nil {
 			pgErr := &pgconn.PgError{}
 			ok := errors.As(err, &pgErr)
 			if ok && pgErr.Code == pgerrcode.UniqueViolation {
 				var existKey string
-				err := r.conn.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", item.URL.String()).Scan(&existKey)
+				err := r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", item.URL.String()).Scan(&existKey)
 				if err != nil {
 					return err
 				}
@@ -48,14 +80,14 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	return nil
 }
 
-func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL) error {
-	_, err := r.conn.Exec(ctx, "INSERT INTO urls (key, url) VALUES ($1, $2)", key, u.String())
+func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
+	_, err := r.pool.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", key, u.String(), userID.String())
 	if err != nil {
 		pgErr := &pgconn.PgError{}
 		ok := errors.As(err, &pgErr)
 		if ok && pgErr.Code == pgerrcode.UniqueViolation {
 			var existKey string
-			err := r.conn.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", u.String()).Scan(&existKey)
+			err := r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", u.String()).Scan(&existKey)
 			if err != nil {
 				return err
 			}
@@ -68,19 +100,23 @@ func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL
 
 func (r *PgURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	var res string
-	err := r.conn.QueryRow(context.Background(), "SELECT url FROM urls WHERE key = $1", key).Scan(&res)
+	var isDeleted bool
+	err := r.pool.QueryRow(ctx, "SELECT url, is_deleted FROM urls WHERE key = $1", key).Scan(&res, &isDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
+	if isDeleted {
+		return nil, domain.ErrURLDeleted
+	}
 	return url.Parse(res)
 }
 
-func NewPgURLRepository(conn *pgx.Conn) *PgURLRepository {
+func NewPgURLRepository(pool *pgxpool.Pool) *PgURLRepository {
 	repo := &PgURLRepository{
-		conn: conn,
+		pool: pool,
 	}
 	return repo
 }

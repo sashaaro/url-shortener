@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/caarlos0/env/v6"
+	"log"
+	"net/url"
 	"strings"
 )
 
@@ -36,9 +38,18 @@ func InitConfig() {
 		Config.BaseURL = "http://localhost:8080"
 	}
 
+	_, err := url.Parse(Config.BaseURL)
+	if err != nil {
+		log.Fatal("invalid base url: ", err)
+	}
+
 	if Config.DatabaseDSN == "" {
 		Config.DatabaseDSN = *databaseDSN
 	}
 
 	Config.DatabaseDSN = strings.TrimSpace(Config.DatabaseDSN)
+
+	if Config.JwtSecret == "" {
+		Config.JwtSecret = "secret"
+	}
 }

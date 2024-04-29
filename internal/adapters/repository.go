@@ -15,17 +15,49 @@ import (
 )
 
 var _ domain.URLRepository = &memURLRepository{
-	urlStore: map[string]url.URL{},
+	urlStore: map[string]memEntry{},
+}
+
+type memEntry struct {
+	url    url.URL
+	hash   domain.HashKey
+	userID uuid.UUID
 }
 
 type memURLRepository struct {
 	mx       sync.Mutex
-	urlStore map[domain.HashKey]url.URL
+	urlStore map[domain.HashKey]memEntry
 }
 
-func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem) error {
+func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	for _, key := range keys {
+		if m.urlStore[key].userID == userID {
+			delete(m.urlStore, key)
+		}
+	}
+	return true, nil
+}
+
+func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
+	l := make([]domain.URLEntry, 0)
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	for _, v := range m.urlStore {
+		if v.userID == userID {
+			l = append(l, domain.URLEntry{
+				ShortURL:    CreatePublicURL(v.hash),
+				OriginalURL: v.url.String(),
+			})
+		}
+	}
+	return l, nil
+}
+
+func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
 	for _, item := range batch {
-		err := m.Add(ctx, item.HashKey, item.URL)
+		err := m.Add(ctx, item.HashKey, item.URL, userID)
 		if err != nil {
 			return err
 		}
@@ -35,14 +67,18 @@ func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchIte
 
 func NewMemURLRepository() domain.URLRepository {
 	return &memURLRepository{
-		urlStore: map[domain.HashKey]url.URL{},
+		urlStore: map[domain.HashKey]memEntry{},
 	}
 }
 
-func (m *memURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL) error {
+func (m *memURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
-	m.urlStore[key] = u
+	m.urlStore[key] = memEntry{
+		url:    u,
+		hash:   key,
+		userID: userID,
+	}
 	return nil
 }
 
@@ -51,7 +87,7 @@ func (m *memURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*
 	defer m.mx.Unlock()
 	u, ok := m.urlStore[key]
 	if ok {
-		return &u, nil
+		return &u.url, nil
 	} else {
 		return nil, nil
 	}
@@ -87,6 +123,7 @@ type fileEntry struct {
 	ID          uuid.UUID `json:"id"`
 	ShortURL    string    `json:"short_url"`
 	OriginalURL string    `json:"original_url"`
+	UserID      uuid.UUID `json:"user_id"`
 }
 
 type FileURLRepository struct {
@@ -96,9 +133,17 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
-func (f *FileURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem) error {
+func (f *FileURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
+	return f.wrapped.DeleteByUser(ctx, keys, userID)
+}
+
+func (f *FileURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
+	return f.wrapped.GetByUser(ctx, userID)
+}
+
+func (f *FileURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
 	for _, item := range batch {
-		err := f.Add(ctx, item.HashKey, item.URL)
+		err := f.Add(ctx, item.HashKey, item.URL, userID)
 		if err != nil {
 			return err
 		}
@@ -122,7 +167,7 @@ func (f *FileURLRepository) load() error {
 			f.logger.Warn("invalid db url entry")
 			continue
 		}
-		err = f.wrapped.Add(context.Background(), entry.ShortURL, *u)
+		err = f.wrapped.Add(context.Background(), entry.ShortURL, *u, entry.UserID)
 		if err != nil {
 			return err
 		}
@@ -134,8 +179,8 @@ func (f *FileURLRepository) Close() error {
 	return f.file.Close()
 }
 
-func (f FileURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL) error {
-	err := f.wrapped.Add(ctx, key, u)
+func (f FileURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
+	err := f.wrapped.Add(ctx, key, u, userID)
 	if err != nil {
 		return err
 	}
