@@ -261,6 +261,7 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool
 	r.Get("/api/user/urls", WithAuth(true, gzipHandle(WithLogging(logger, handlers.getMyUrls))))
 	r.Delete("/api/user/urls", WithAuth(false, gzipHandle(WithLogging(logger, handlers.deleteUrls))))
 	r.Get("/ping", handlers.ping)
+	r.Mount("/debug", middleware.Profiler())
 
 	return r
 }
