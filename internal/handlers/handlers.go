@@ -1,3 +1,4 @@
+// Модуль http хендлеров
 package handlers
 
 import (
@@ -17,6 +18,7 @@ import (
 	"slices"
 )
 
+// основные хендлеры
 type HTTPHandlers struct {
 	urlRepo          domain.URLRepository
 	genShortURLToken domain.GenShortURLToken
@@ -24,6 +26,7 @@ type HTTPHandlers struct {
 	pool             *pgxpool.Pool
 }
 
+// конструктор
 func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenShortURLToken, logger zap.SugaredLogger, pool *pgxpool.Pool) *HTTPHandlers {
 	return &HTTPHandlers{
 		urlRepo:          urlRepo,
@@ -82,9 +85,12 @@ func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http
 	http.Redirect(writer, request, originURL.String(), http.StatusTemporaryRedirect)
 }
 
+// запрос на укорочение ссылоки
 type ShortenRequest struct {
 	URL string `json:"url"`
 }
+
+// ответ на укорочение ссылоки
 type ShortenResponse struct {
 	Result string `json:"result"`
 }
@@ -131,11 +137,13 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 	}
 }
 
+// запрос на укорочение нескольких ссылок
 type ShortenBatchItem struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
+// ответ на укорочение нескольких ссылок
 type ShortenItemRes struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
@@ -249,6 +257,7 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// создание основных хендлеров
 func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

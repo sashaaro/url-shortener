@@ -14,16 +14,19 @@ import (
 
 var _ domain.URLRepository = &PgURLRepository{}
 
+// хранение ссылок в postgres
 type PgURLRepository struct {
 	pool *pgxpool.Pool
 }
 
+// удаление
 func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	res, err := r.pool.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1)", keys)
 
 	return res.RowsAffected() == int64(len(keys)), err
 }
 
+// получение
 func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	rows, err := r.pool.Query(ctx, "SELECT key, url FROM urls WHERE user_id = $1", userID.String())
 	if err != nil {
@@ -48,6 +51,7 @@ func (r *PgURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]do
 	return urls, nil
 }
 
+// добавление нескольких ссылок
 func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -80,6 +84,7 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	return nil
 }
 
+// добавление ссылки
 func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
 	_, err := r.pool.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", key, u.String(), userID.String())
 	if err != nil {
@@ -98,6 +103,7 @@ func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL
 	return err
 }
 
+// получение ссылки по ключу
 func (r *PgURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	var res string
 	var isDeleted bool
@@ -114,6 +120,7 @@ func (r *PgURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*u
 	return url.Parse(res)
 }
 
+// конструктор
 func NewPgURLRepository(pool *pgxpool.Pool) *PgURLRepository {
 	repo := &PgURLRepository{
 		pool: pool,

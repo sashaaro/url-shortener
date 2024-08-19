@@ -16,11 +16,13 @@ import (
 	"time"
 )
 
+// payload jwt токена
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID uuid.UUID `json:"user_id,omitempty"`
 }
 
+// добавление лога запроса
 func WithLogging(logger zap.SugaredLogger, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -59,6 +61,7 @@ type loggingResponseWriter struct {
 	responseData        *responseData
 }
 
+// декоратор для ResponseWriter.Write
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	// записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
@@ -66,6 +69,7 @@ func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	return size, err
 }
 
+// декоратор для ResponseWriter.WriteHeader
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	// записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
@@ -108,6 +112,7 @@ type gzipWriter struct {
 	Writer io.Writer
 }
 
+// декоратор для Write
 func (w gzipWriter) Write(b []byte) (int, error) {
 	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
 	return w.Writer.Write(b)
@@ -130,10 +135,12 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
+// декоратор для gzip.Reader().Read
 func (c compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// декоратор для Reader.Close()
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return err
@@ -141,8 +148,10 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
+// время жизни токена по умолчанию
 const JwtTTL = 15 * time.Minute
 
+// создание токена
 func BuildJWTString(secretKey string, userID uuid.UUID) (string, error) {
 	// создаём новый токен с алгоритмом подписи HS256 и утверждениями — Claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
@@ -177,6 +186,7 @@ func fetchUserIDFromToken(secretKey string, tokenStr string) (uuid.UUID, error) 
 	return claims.UserID, nil
 }
 
+// провекра jwt и добавление пользователя в context
 func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 	hostname := utils.Must(url.Parse(internal.Config.BaseURL)).Hostname()
 	return func(w http.ResponseWriter, r *http.Request) {
