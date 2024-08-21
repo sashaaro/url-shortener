@@ -30,3 +30,10 @@ git fetch template && git checkout template/main .github
 При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
 
 Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
+
+```shell
+go tool pprof -top -diff_base=profiles/base.pb.gz profiles/result.pb.gz
+
+godoc -http=:8080 
+http://localhost:8080/pkg/github.com/sashaaro/url-shortener/internal/handlers/?m=all
+```

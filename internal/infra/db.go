@@ -11,6 +11,7 @@ import (
 	"log"
 )
 
+// создание pg подключения
 func CreatePgxPool() *pgxpool.Pool {
 	config, err := pgxpool.ParseConfig(internal.Config.DatabaseDSN)
 	if err != nil {
