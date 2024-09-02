@@ -10,12 +10,14 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 )
 
+// ExitOnMainAnalyzer аналайзер
 var ExitOnMainAnalyzer = &analysis.Analyzer{
 	Name: "exitonmain",
 	Doc:  "check for call os.Exit() on func main() in packet main",
 	Run:  run,
 }
 
+// run запуск аналайзера
 func run(pass *analysis.Pass) (any, error) {
 	isExit := func(v *ast.CallExpr) bool {
 		return IsFunctionNamed(typeutil.StaticCallee(pass.TypesInfo, v), "os", "Exit")
@@ -66,6 +68,7 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// IsFunctionNamed проверка имени функции
 func IsFunctionNamed(f *types.Func, pkgPath string, names ...string) bool {
 	if f == nil {
 		return false
