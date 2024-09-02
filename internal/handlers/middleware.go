@@ -16,13 +16,13 @@ import (
 	"time"
 )
 
-// payload jwt токена
+// Claims - payload jwt токена
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID uuid.UUID `json:"user_id,omitempty"`
 }
 
-// добавление лога запроса
+// WithLogging - добавление лога запроса
 func WithLogging(logger zap.SugaredLogger, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -148,10 +148,10 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-// время жизни токена по умолчанию
+// JwtTTL - время жизни токена по умолчанию
 const JwtTTL = 15 * time.Minute
 
-// создание токена
+// BuildJWTString - создание токена
 func BuildJWTString(secretKey string, userID uuid.UUID) (string, error) {
 	// создаём новый токен с алгоритмом подписи HS256 и утверждениями — Claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
@@ -186,7 +186,7 @@ func fetchUserIDFromToken(secretKey string, tokenStr string) (uuid.UUID, error) 
 	return claims.UserID, nil
 }
 
-// провекра jwt и добавление пользователя в context
+// WithAuth провекра jwt и добавление пользователя в context
 func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 	hostname := utils.Must(url.Parse(internal.Config.BaseURL)).Hostname()
 	return func(w http.ResponseWriter, r *http.Request) {

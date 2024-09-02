@@ -1,3 +1,4 @@
+// Package infra
 package infra
 
 import (
@@ -11,7 +12,7 @@ import (
 	"log"
 )
 
-// создание pg подключения
+// CreatePgxPool создание pg подключения
 func CreatePgxPool() *pgxpool.Pool {
 	config, err := pgxpool.ParseConfig(internal.Config.DatabaseDSN)
 	if err != nil {

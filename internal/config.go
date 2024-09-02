@@ -1,9 +1,10 @@
+// Package internal - кишки
 package internal
 
-// основной экземляр конфига приложения
+// Config основной экземляр конфига приложения
 var Config = config{}
 
-// конфиг приложения
+// config конфиг приложения
 type config struct {
 	ServerAddress   string `env:"SERVER_ADDRESS"`
 	BaseURL         string `env:"BASE_URL"`

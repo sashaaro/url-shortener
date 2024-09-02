@@ -14,7 +14,7 @@ func userIDFromReq(req *http.Request) (uuid.UUID, error) {
 	return userIDFromCtx(req.Context())
 }
 
-// получение пользователя из http запроса
+// MustUserIDFromReq - получение пользователя из http запроса
 func MustUserIDFromReq(req *http.Request) uuid.UUID {
 	return utils.Must(userIDFromReq(req))
 }
@@ -27,7 +27,7 @@ func userIDFromCtx(ctx context.Context) (uuid.UUID, error) {
 	return userID, nil
 }
 
-// получение пользователя из контекста
+// UserIDToCxt - получение пользователя из контекста
 func UserIDToCxt(ctx context.Context, userID uuid.UUID) context.Context {
 	return context.WithValue(ctx, &userContext{}, userID)
 }

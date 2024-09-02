@@ -18,10 +18,7 @@ var ExitOnMainAnalyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (any, error) {
 	isExit := func(v *ast.CallExpr) bool {
-		if IsFunctionNamed(typeutil.StaticCallee(pass.TypesInfo, v), "os", "Exit") {
-			return true
-		}
-		return false
+		return IsFunctionNamed(typeutil.StaticCallee(pass.TypesInfo, v), "os", "Exit")
 	}
 
 	if pass.Pkg.Name() != "main" {

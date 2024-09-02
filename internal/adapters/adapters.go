@@ -1,3 +1,4 @@
+// Package adapters - адапторы к доменным интерфейсам
 package adapters
 
 import (
@@ -8,7 +9,7 @@ import (
 	"github.com/sashaaro/url-shortener/internal/domain"
 )
 
-// генерация токена
+// GenBase64ShortURLToken - генерация токена
 func GenBase64ShortURLToken() domain.HashKey {
 	length := 8
 	bufSize := length*6/8 + 1
@@ -20,7 +21,7 @@ func GenBase64ShortURLToken() domain.HashKey {
 	return base64.URLEncoding.EncodeToString(buf)[:length]
 }
 
-// создание ссылки из ключа
+// CreatePublicURL - создание ссылки из ключа
 func CreatePublicURL(key domain.HashKey) string {
 	return internal.Config.BaseURL + "/" + key
 }
