@@ -168,7 +168,8 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 
 	originURLs := make([]domain.BatchItem, 0, len(req))
 	for _, item := range req {
-		u, err := url.Parse(item.OriginalURL)
+		var u *url.URL
+		u, err = url.Parse(item.OriginalURL)
 		if err != nil {
 			http.Error(w, "Invalid url", http.StatusBadRequest)
 			return

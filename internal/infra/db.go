@@ -24,11 +24,11 @@ func CreatePgxPool() *pgxpool.Pool {
 
 	db := stdlib.OpenDB(*config.ConnConfig)
 
-	if err := goose.SetDialect("postgres"); err != nil {
+	if err = goose.SetDialect("postgres"); err != nil {
 		log.Fatal("can't set dialect: ", err)
 	}
 
-	if err := goose.Up(db, "./"); err != nil {
+	if err = goose.Up(db, "./"); err != nil {
 		log.Fatal("can't run migrations: ", err)
 	}
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)

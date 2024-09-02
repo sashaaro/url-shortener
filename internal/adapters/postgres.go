@@ -61,13 +61,13 @@ func (r *PgURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem
 	defer tx.Rollback(ctx)
 
 	for _, item := range batch {
-		_, err := tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID.String())
+		_, err = tx.Exec(ctx, "INSERT INTO urls (key, url, user_id) VALUES ($1, $2, $3)", item.HashKey, item.URL.String(), userID.String())
 		if err != nil {
 			pgErr := &pgconn.PgError{}
 			ok := errors.As(err, &pgErr)
 			if ok && pgErr.Code == pgerrcode.UniqueViolation {
 				var existKey string
-				err := r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", item.URL.String()).Scan(&existKey)
+				err = r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", item.URL.String()).Scan(&existKey)
 				if err != nil {
 					return err
 				}
@@ -92,7 +92,7 @@ func (r *PgURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL
 		ok := errors.As(err, &pgErr)
 		if ok && pgErr.Code == pgerrcode.UniqueViolation {
 			var existKey string
-			err := r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", u.String()).Scan(&existKey)
+			err = r.pool.QueryRow(ctx, "SELECT key FROM urls WHERE url = $1 LIMIT 1", u.String()).Scan(&existKey)
 			if err != nil {
 				return err
 			}

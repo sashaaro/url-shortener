@@ -26,8 +26,8 @@ type memEntry struct {
 
 // хранение ссылок в памяти
 type memURLRepository struct {
-	mx       sync.Mutex
 	urlStore map[domain.HashKey]memEntry
+	mx       sync.Mutex
 }
 
 // удаление ссылок пользователя
@@ -128,9 +128,9 @@ func NewFileURLRepository(
 }
 
 type fileEntry struct {
-	ID          uuid.UUID `json:"id"`
 	ShortURL    string    `json:"short_url"`
 	OriginalURL string    `json:"original_url"`
+	ID          uuid.UUID `json:"id"`
 	UserID      uuid.UUID `json:"user_id"`
 }
 
