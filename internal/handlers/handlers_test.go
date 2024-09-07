@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/infra"
@@ -75,11 +76,6 @@ func TestIteration2(t *testing.T) {
 			require.Equal(t, http.StatusGone, resp.StatusCode)
 		}
 
-		resp, err = httpClient.Get(testServer.URL + "/NoExistShortUrl")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		require.Equal(t, http.StatusNotFound, resp.StatusCode)
-
 		if internal.Config.DatabaseDSN != "" { // check unique key for database
 			resp, err = httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`https://github.com`))
 			require.NoError(t, err)
@@ -134,5 +130,47 @@ func TestIteration2(t *testing.T) {
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("create short urls batch and remove them", func(t *testing.T) {
+		resp, err := httpClient.Post(testServer.URL+"/api/shorten/batch", "application/json", strings.NewReader(
+			`[
+{"correlation_id": "1", "original_url": "https://yandex.ru"},
+{"correlation_id": "2", "original_url": "https://rambler.ru"},
+{"correlation_id": "3", "original_url": "https://google.com"}
+]`),
+		)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		urls := make([]ShortenItemRes, 0)
+		err = json.Unmarshal(b, &urls)
+		require.NoError(t, err)
+		require.Len(t, urls, 3)
+		id := strings.Split(urls[0].ShortURL, "/")[3]
+		id2 := strings.Split(urls[1].ShortURL, "/")[3]
+
+		req, _ := http.NewRequest(http.MethodDelete, testServer.URL+"/api/user/urls", strings.NewReader(
+			fmt.Sprintf(`["%s", "%s"]`, id, id2)))
+		resp, err = httpClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusAccepted, resp.StatusCode)
+	})
+
+	t.Run("bad request", func(t *testing.T) {
+		resp, err := httpClient.Post(testServer.URL, "text/plain", strings.NewReader(`wrong url format`))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		resp, err = httpClient.Get(testServer.URL + "/NoExistShortUrl")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 )
 
 // HTTPHandlers основные хендлеры
@@ -44,7 +45,7 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 	}
 
 	originURL, err := url.Parse(string(b))
-	if err != nil {
+	if err != nil || !strings.HasPrefix(originURL.Scheme, "http") {
 		http.Error(writer, "invalid url", http.StatusBadRequest)
 		return
 	}
