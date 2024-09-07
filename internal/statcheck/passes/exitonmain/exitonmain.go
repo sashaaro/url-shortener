@@ -28,39 +28,29 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	for _, file := range pass.Files {
-		inMain := 0
 		ast.Inspect(file, func(node ast.Node) bool {
-			if inMain == 0 {
-				switch x := node.(type) {
-				case *ast.FuncDecl:
-					if x.Name.Name == "main" {
-						inMain++
-					} else {
-						return false
+			if fn, ok := node.(*ast.FuncDecl); ok && fn.Name.Name == "main" {
+				ast.Inspect(fn.Body, func(bodyNode ast.Node) bool {
+					switch x := bodyNode.(type) {
+					case *ast.ExprStmt:
+						if call, ok := x.X.(*ast.CallExpr); ok {
+							if isExit(call) {
+								pass.Reportf(call.Pos(), `Call os.Exit on function main of package main`)
+							}
+						}
+					case *ast.DeferStmt:
+						if isExit(x.Call) {
+							pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
+						}
+					case *ast.GoStmt:
+						if isExit(x.Call) {
+							pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
+						}
 					}
-				}
+					return true
+				})
+
 				return true
-			}
-			if node == nil {
-				inMain--
-				return true
-			}
-			inMain++
-			switch x := node.(type) {
-			case *ast.ExprStmt:
-				if call, ok := x.X.(*ast.CallExpr); ok {
-					if isExit(call) {
-						pass.Reportf(call.Pos(), `Call os.Exit on function main of package main`)
-					}
-				}
-			case *ast.DeferStmt:
-				if isExit(x.Call) {
-					pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
-				}
-			case *ast.GoStmt:
-				if isExit(x.Call) {
-					pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
-				}
 			}
 			return true
 		})
