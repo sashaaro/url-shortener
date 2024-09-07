@@ -31,21 +31,8 @@ func run(pass *analysis.Pass) (any, error) {
 		ast.Inspect(file, func(node ast.Node) bool {
 			if fn, ok := node.(*ast.FuncDecl); ok && fn.Name.Name == "main" {
 				ast.Inspect(fn.Body, func(bodyNode ast.Node) bool {
-					switch x := bodyNode.(type) {
-					case *ast.ExprStmt:
-						if call, ok := x.X.(*ast.CallExpr); ok {
-							if isExit(call) {
-								pass.Reportf(call.Pos(), `Call os.Exit on function main of package main`)
-							}
-						}
-					case *ast.DeferStmt:
-						if isExit(x.Call) {
-							pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
-						}
-					case *ast.GoStmt:
-						if isExit(x.Call) {
-							pass.Reportf(x.Call.Pos(), `Call os.Exit on function main of package main`)
-						}
+					if callExpr, ok := bodyNode.(*ast.CallExpr); ok && isExit(callExpr) {
+						pass.Reportf(callExpr.Pos(), `Call os.Exit on function main of package main`)
 					}
 					return true
 				})
