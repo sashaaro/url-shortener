@@ -29,16 +29,17 @@ func run(pass *analysis.Pass) (any, error) {
 
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
-			if fn, ok := node.(*ast.FuncDecl); ok && fn.Name.Name == "main" {
-				ast.Inspect(fn.Body, func(bodyNode ast.Node) bool {
-					if callExpr, ok := bodyNode.(*ast.CallExpr); ok && isExit(callExpr) {
-						pass.Reportf(callExpr.Pos(), `Call os.Exit on function main of package main`)
-					}
-					return true
-				})
-
+			fn, ok := node.(*ast.FuncDecl)
+			if !ok || fn.Name.Name != "main" {
 				return true
 			}
+			ast.Inspect(fn.Body, func(bodyNode ast.Node) bool {
+				if callExpr, ok := bodyNode.(*ast.CallExpr); ok && isExit(callExpr) {
+					pass.Reportf(callExpr.Pos(), `Call os.Exit on function main of package main`)
+				}
+				return true
+			})
+
 			return true
 		})
 	}
