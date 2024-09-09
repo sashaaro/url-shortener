@@ -36,11 +36,12 @@ func run(pass *analysis.Pass) (any, error) {
 			ast.Inspect(fn.Body, func(bodyNode ast.Node) bool {
 				if callExpr, ok := bodyNode.(*ast.CallExpr); ok && isExit(callExpr) {
 					pass.Reportf(callExpr.Pos(), `Call os.Exit on function main of package main`)
+					return false
 				}
 				return true
 			})
 
-			return true
+			return false
 		})
 	}
 	return nil, nil
