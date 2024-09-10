@@ -2,7 +2,7 @@ package adapters
 
 import "go.uber.org/zap"
 
-// создание логина
+// CreateLogger - создание логина
 func CreateLogger() zap.SugaredLogger {
 	l, err := zap.NewDevelopment()
 	if err != nil {

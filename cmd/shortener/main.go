@@ -7,11 +7,25 @@ import (
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/handlers"
 	"github.com/sashaaro/url-shortener/internal/infra"
+	"github.com/sashaaro/url-shortener/internal/version"
 	"log"
 	"net/http"
+	"os"
+)
+
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
 )
 
 func main() {
+	version.Build{
+		BuildVersion: buildVersion,
+		BuildDate:    buildDate,
+		BuildCommit:  buildCommit,
+	}.Print(os.Stdout)
+
 	internal.InitConfig()
 
 	logger := adapters.CreateLogger()

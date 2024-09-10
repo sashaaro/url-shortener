@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// инициализация конфигурации
+// InitConfig инициализация конфигурации
 func InitConfig() {
 	serverAddress := flag.String("a", "", "listen address")
 	baseURL := flag.String("b", "", "base url")

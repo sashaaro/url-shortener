@@ -1,3 +1,4 @@
+// Package migrations для бд
 package migrations
 
 import (

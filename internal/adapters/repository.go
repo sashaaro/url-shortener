@@ -26,11 +26,11 @@ type memEntry struct {
 
 // хранение ссылок в памяти
 type memURLRepository struct {
-	mx       sync.Mutex
 	urlStore map[domain.HashKey]memEntry
+	mx       sync.Mutex
 }
 
-// удаление ссылок пользователя
+// DeleteByUser удаление ссылок пользователя
 func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
@@ -42,7 +42,7 @@ func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashK
 	return true, nil
 }
 
-// получение ссылко пользователя
+// GetByUser получение ссылко пользователя
 func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	l := make([]domain.URLEntry, 0)
 	m.mx.Lock()
@@ -58,7 +58,7 @@ func (m *memURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]d
 	return l, nil
 }
 
-// добавление нескольких ссылок
+// BatchAdd добавление нескольких ссылок
 func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
 	for _, item := range batch {
 		err := m.Add(ctx, item.HashKey, item.URL, userID)
@@ -69,14 +69,14 @@ func (m *memURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchIte
 	return nil
 }
 
-// конструктор
+// NewMemURLRepository - конструктор
 func NewMemURLRepository() domain.URLRepository {
 	return &memURLRepository{
 		urlStore: map[domain.HashKey]memEntry{},
 	}
 }
 
-// добавление ссылки
+// Add добавление ссылки
 func (m *memURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
 	m.mx.Lock()
 	defer m.mx.Unlock()
@@ -88,7 +88,7 @@ func (m *memURLRepository) Add(ctx context.Context, key domain.HashKey, u url.UR
 	return nil
 }
 
-// получение ссылки по ключу
+// GetByHash получение ссылки по ключу
 func (m *memURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
@@ -102,7 +102,7 @@ func (m *memURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*
 
 var _ domain.URLRepository = &FileURLRepository{}
 
-// конструктор
+// NewFileURLRepository конструктор
 func NewFileURLRepository(
 	filePath string,
 	wrapped domain.URLRepository,
@@ -128,13 +128,13 @@ func NewFileURLRepository(
 }
 
 type fileEntry struct {
-	ID          uuid.UUID `json:"id"`
 	ShortURL    string    `json:"short_url"`
 	OriginalURL string    `json:"original_url"`
+	ID          uuid.UUID `json:"id"`
 	UserID      uuid.UUID `json:"user_id"`
 }
 
-// сохранение ссылок в файл
+// FileURLRepository - сохранение ссылок в файл
 type FileURLRepository struct {
 	file    *os.File
 	encoder *json.Encoder
@@ -142,17 +142,17 @@ type FileURLRepository struct {
 	logger  zap.SugaredLogger
 }
 
-// удаление
+// DeleteByUser удаление
 func (f *FileURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	return f.wrapped.DeleteByUser(ctx, keys, userID)
 }
 
-// получение
+// GetByUser получение
 func (f *FileURLRepository) GetByUser(ctx context.Context, userID uuid.UUID) ([]domain.URLEntry, error) {
 	return f.wrapped.GetByUser(ctx, userID)
 }
 
-// добавление нескольких ссылок
+// BatchAdd добавление нескольких ссылок
 func (f *FileURLRepository) BatchAdd(ctx context.Context, batch []domain.BatchItem, userID uuid.UUID) error {
 	for _, item := range batch {
 		err := f.Add(ctx, item.HashKey, item.URL, userID)
@@ -187,12 +187,12 @@ func (f *FileURLRepository) load() error {
 	return nil
 }
 
-// закрыть файл
+// Close закрыть файл
 func (f *FileURLRepository) Close() error {
 	return f.file.Close()
 }
 
-// добавление ссылки
+// Add добавление ссылки
 func (f FileURLRepository) Add(ctx context.Context, key domain.HashKey, u url.URL, userID uuid.UUID) error {
 	err := f.wrapped.Add(ctx, key, u, userID)
 	if err != nil {
@@ -206,7 +206,7 @@ func (f FileURLRepository) Add(ctx context.Context, key domain.HashKey, u url.UR
 	return err
 }
 
-// получение ссылки по ключу
+// GetByHash получение ссылки по ключу
 func (f FileURLRepository) GetByHash(ctx context.Context, key domain.HashKey) (*url.URL, error) {
 	return f.wrapped.GetByHash(ctx, key)
 }

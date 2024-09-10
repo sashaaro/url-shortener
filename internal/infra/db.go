@@ -1,3 +1,4 @@
+// Package infra
 package infra
 
 import (
@@ -11,7 +12,7 @@ import (
 	"log"
 )
 
-// создание pg подключения
+// CreatePgxPool создание pg подключения
 func CreatePgxPool() *pgxpool.Pool {
 	config, err := pgxpool.ParseConfig(internal.Config.DatabaseDSN)
 	if err != nil {
@@ -24,11 +25,11 @@ func CreatePgxPool() *pgxpool.Pool {
 
 	db := stdlib.OpenDB(*config.ConnConfig)
 
-	if err := goose.SetDialect("postgres"); err != nil {
+	if err = goose.SetDialect("postgres"); err != nil {
 		log.Fatal("can't set dialect: ", err)
 	}
 
-	if err := goose.Up(db, "./"); err != nil {
+	if err = goose.Up(db, "./"); err != nil {
 		log.Fatal("can't run migrations: ", err)
 	}
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)

@@ -37,3 +37,11 @@ go tool pprof -top -diff_base=profiles/base.pb.gz profiles/result.pb.gz
 godoc -http=:8080 
 http://localhost:8080/pkg/github.com/sashaaro/url-shortener/internal/handlers/?m=all
 ```
+
+Команда статического анализа
+```shell
+go run ./cmd/staticlint ./...
+staticcheck ./...
+
+go run -ldflags "-X main.buildVersion=v1.0.1 -X main.buildDate=02.09.2024 -X main.buildCommit=3dc3f1c7b"  ./cmd/shortener/main.go
+```
