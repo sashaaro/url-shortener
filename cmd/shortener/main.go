@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
@@ -12,6 +14,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 var (
@@ -46,14 +50,41 @@ func main() {
 		}
 	}
 
-	if internal.Config.EnableHTTPS {
-		log.Fatal(
-			http.Serve(
-				autocert.NewListener(internal.Config.ServerAddress, "url-shortener.ru", "www.url-shortener.ru"),
-				handlers.CreateServeMux(urlRepo, logger, pool),
-			),
-		)
-	} else {
-		log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger, pool)))
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+	srv := http.Server{
+		Addr:    internal.Config.ServerAddress,
+		Handler: handlers.CreateServeMux(urlRepo, logger, pool),
 	}
+
+	signalClosed := make(chan struct{})
+
+	go func() {
+		<-sigint
+		log.Println("graceful shutdown...")
+
+		if err := srv.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+
+		if pool != nil {
+			log.Println("shutting down pool")
+			pool.Close()
+		}
+
+		close(signalClosed)
+	}()
+
+	var err error
+	if internal.Config.EnableHTTPS {
+		err = srv.Serve(autocert.NewListener(internal.Config.ServerAddress, "url-shortener.ru", "www.url-shortener.ru"))
+	} else {
+		err = srv.ListenAndServe()
+	}
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("HTTP server ListenAndServe: %v", err)
+	}
+
+	<-signalClosed
 }
