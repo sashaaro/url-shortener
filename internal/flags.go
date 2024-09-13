@@ -14,6 +14,7 @@ func InitConfig() {
 	serverAddress := flag.String("a", "", "listen address")
 	baseURL := flag.String("b", "", "base url")
 	databaseDSN := flag.String("d", "", "database dsn")
+	enableHttps := flag.String("s", "", "Enable https")
 
 	fileStoragePath := flag.String("f", "/tmp/short-url-db.json", "file path")
 
@@ -37,6 +38,10 @@ func InitConfig() {
 	}
 	if Config.BaseURL == "" {
 		Config.BaseURL = "http://localhost:8080"
+	}
+
+	if enableHttps != nil && len(*enableHttps) > 0 && *enableHttps != "0" {
+		Config.EnableHTTPS = true
 	}
 
 	_, err := url.Parse(Config.BaseURL)

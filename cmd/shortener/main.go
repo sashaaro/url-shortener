@@ -8,6 +8,7 @@ import (
 	"github.com/sashaaro/url-shortener/internal/handlers"
 	"github.com/sashaaro/url-shortener/internal/infra"
 	"github.com/sashaaro/url-shortener/internal/version"
+	"golang.org/x/crypto/acme/autocert"
 	"log"
 	"net/http"
 	"os"
@@ -45,5 +46,14 @@ func main() {
 		}
 	}
 
-	log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger, pool)))
+	if internal.Config.EnableHTTPS {
+		log.Fatal(
+			http.Serve(
+				autocert.NewListener(internal.Config.ServerAddress, "url-shortener.ru", "www.url-shortener.ru"),
+				handlers.CreateServeMux(urlRepo, logger, pool),
+			),
+		)
+	} else {
+		log.Fatal(http.ListenAndServe(internal.Config.ServerAddress, handlers.CreateServeMux(urlRepo, logger, pool)))
+	}
 }
