@@ -11,4 +11,5 @@ type config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	JwtSecret       string `env:"JWT_SECRET"`
+	EnableHTTPS     bool   `env:"ENABLE_HTTPS"`
 }
