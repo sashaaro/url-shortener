@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kinbiko/jsonassert"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/infra"
@@ -38,6 +39,7 @@ func TestIteration2(t *testing.T) {
 		require.NoError(t, err)
 		urlRepo = adapters.NewPgURLRepository(pool)
 	}
+	internal.Config.TrustedSubnet = "192.168.146.0/24"
 
 	testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
 	defer testServer.Close()
@@ -172,5 +174,26 @@ func TestIteration2(t *testing.T) {
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+
+	t.Run("stats", func(t *testing.T) {
+		req := utils.Must(http.NewRequest("GET", testServer.URL+"/api/internal/stats", nil))
+		req.Header.Add("X-Real-IP", "192.168.146.2")
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		jsonassert.New(t).Assertf(string(b), `{"urls": "<<PRESENCE>>", "users": "<<PRESENCE>>"}`)
+
+		req = utils.Must(http.NewRequest("GET", testServer.URL+"/api/internal/stats", nil))
+		resp, err = httpClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 }

@@ -12,4 +12,5 @@ type config struct {
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	JwtSecret       string `env:"JWT_SECRET"`
 	EnableHTTPS     bool   `env:"ENABLE_HTTPS"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"`
 }

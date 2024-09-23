@@ -8,11 +8,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/utils"
 	"go.uber.org/zap"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -259,11 +261,50 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
+type statsResponse struct {
+	Urls  int64 `json:"urls"`
+	Users int64 `json:"users"`
+}
+
+func (r *HTTPHandlers) stats(w http.ResponseWriter, request *http.Request) {
+	resp := statsResponse{}
+	var err error
+	resp.Urls, err = r.urlRepo.CountUrls(request.Context())
+	if err != nil {
+		r.logger.Error("cannot get urls", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Cannot get urls count"))
+		return
+	}
+
+	resp.Users, err = r.urlRepo.CountUsers(request.Context())
+	if err != nil {
+		r.logger.Error("cannot get urls", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Cannot get urls count"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
 // CreateServeMux - создание основных хендлеров
 func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger, pool)
+
+	statsHandler := WithAuth(false, gzipHandle(WithLogging(logger, handlers.stats)))
+	if internal.Config.TrustedSubnet != "" {
+		_, subnet, err := net.ParseCIDR(internal.Config.TrustedSubnet)
+		if err != nil {
+			panic(err)
+		}
+
+		statsHandler = TrustedClientMiddleware(logger, subnet)(statsHandler)
+	}
 
 	r.Post("/", WithAuth(false, gzipHandle(WithLogging(logger, handlers.createShortHandler))))
 	r.Get("/{hash}", WithAuth(false, gzipHandle(WithLogging(logger, handlers.getShortHandler))))
@@ -271,6 +312,8 @@ func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool
 	r.Post("/api/shorten/batch", WithAuth(false, gzipHandle(WithLogging(logger, handlers.batchShorten))))
 	r.Get("/api/user/urls", WithAuth(true, gzipHandle(WithLogging(logger, handlers.getMyUrls))))
 	r.Delete("/api/user/urls", WithAuth(false, gzipHandle(WithLogging(logger, handlers.deleteUrls))))
+	r.Get("/api/internal/stats", statsHandler)
+
 	r.Get("/ping", handlers.ping)
 	r.Mount("/debug", middleware.Profiler())
 
