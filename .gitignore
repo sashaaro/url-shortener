@@ -26,3 +26,4 @@ vendor/
 
 shortener
 staticlint
+proto/**.go
