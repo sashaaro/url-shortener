@@ -26,4 +26,4 @@ vendor/
 
 shortener
 staticlint
-proto/**.go
+# gproto/**.go

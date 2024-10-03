@@ -9,6 +9,7 @@ import (
 	"github.com/kinbiko/jsonassert"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/infra"
 	"github.com/sashaaro/url-shortener/internal/utils"
 	"github.com/stretchr/testify/require"
@@ -41,7 +42,7 @@ func TestIteration2(t *testing.T) {
 	}
 	internal.Config.TrustedSubnet = "192.168.146.0/24"
 
-	testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
+	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo), logger, nil))
 	defer testServer.Close()
 	internal.Config.BaseURL = testServer.URL
 

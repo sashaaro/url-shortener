@@ -1,3 +1,4 @@
+// Package grpc - grpc сервис
 package grpc
 
 import (
@@ -12,16 +13,19 @@ import (
 	"strings"
 )
 
+// GrpcService - сервис
 type GrpcService struct {
 	proto.UnimplementedURLShortenerServer
 	genShortURLToken domain.GenShortURLToken
 	service          *domain.ShortenerService
 }
 
+// NewGrpcService конструктор
 func NewGrpcService(service *domain.ShortenerService, genShortURLToken domain.GenShortURLToken) *GrpcService {
 	return &GrpcService{service: service, genShortURLToken: genShortURLToken}
 }
 
+// Shorten создание
 func (s *GrpcService) Shorten(ctx context.Context, req *proto.ShortenRequest) (*proto.ShortenResponse, error) {
 	key := s.genShortURLToken()
 	userID, err := uuid.Parse(req.UserId)
@@ -41,6 +45,7 @@ func (s *GrpcService) Shorten(ctx context.Context, req *proto.ShortenRequest) (*
 	return &proto.ShortenResponse{Result: adapters.CreatePublicURL(key)}, nil
 }
 
+// GetOriginLink получение
 func (s *GrpcService) GetOriginLink(ctx context.Context, req *proto.GetOriginLinkRequest) (*proto.GetOriginLinkResponse, error) {
 	originLink, err := s.service.GetOriginLink(ctx, req.Hash)
 	if err != nil {
@@ -49,6 +54,7 @@ func (s *GrpcService) GetOriginLink(ctx context.Context, req *proto.GetOriginLin
 	return &proto.GetOriginLinkResponse{OriginalUrl: originLink.String()}, nil
 }
 
+// GetUserUrls получение
 func (s *GrpcService) GetUserUrls(ctx context.Context, req *proto.GetUserUrlsRequest) (*proto.GetUserUrlsResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
@@ -71,6 +77,7 @@ func (s *GrpcService) GetUserUrls(ctx context.Context, req *proto.GetUserUrlsReq
 	return res, nil
 }
 
+// DeleteUrls удаление
 func (s *GrpcService) DeleteUrls(ctx context.Context, req *proto.DeleteUrlsRequest) (*proto.DeleteUrlsResponse, error) {
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
@@ -89,6 +96,8 @@ func (s *GrpcService) DeleteUrls(ctx context.Context, req *proto.DeleteUrlsReque
 
 	return &proto.DeleteUrlsResponse{}, nil
 }
+
+// GetStats статистика
 func (s *GrpcService) GetStats(ctx context.Context, req *proto.StatsRequest) (*proto.StatsResponse, error) {
 	res, err := s.service.Stats(ctx)
 	if err != nil {
@@ -100,6 +109,8 @@ func (s *GrpcService) GetStats(ctx context.Context, req *proto.StatsRequest) (*p
 		Users: res.Users,
 	}, nil
 }
+
+// Ping пинг
 func (s *GrpcService) Ping(ctx context.Context, req *proto.PingRequest) (*proto.PongResponse, error) {
 	return &proto.PongResponse{}, nil
 }
