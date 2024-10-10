@@ -8,11 +8,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
 	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/utils"
 	"go.uber.org/zap"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -21,19 +23,21 @@ import (
 
 // HTTPHandlers основные хендлеры
 type HTTPHandlers struct {
-	urlRepo          domain.URLRepository
-	genShortURLToken domain.GenShortURLToken
-	logger           zap.SugaredLogger
-	pool             *pgxpool.Pool
+	service *domain.ShortenerService
+	logger  zap.SugaredLogger
+	pool    *pgxpool.Pool
 }
 
 // NewHTTPHandlers конструктор
-func NewHTTPHandlers(urlRepo domain.URLRepository, genShortURLToken domain.GenShortURLToken, logger zap.SugaredLogger, pool *pgxpool.Pool) *HTTPHandlers {
+func NewHTTPHandlers(
+	service *domain.ShortenerService,
+	logger zap.SugaredLogger,
+	pool *pgxpool.Pool,
+) *HTTPHandlers {
 	return &HTTPHandlers{
-		urlRepo:          urlRepo,
-		genShortURLToken: genShortURLToken,
-		logger:           logger,
-		pool:             pool,
+		service: service,
+		logger:  logger,
+		pool:    pool,
 	}
 }
 
@@ -49,8 +53,7 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 		http.Error(writer, "invalid url", http.StatusBadRequest)
 		return
 	}
-	key := r.genShortURLToken()
-	err = r.urlRepo.Add(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
+	key, err := r.service.CreateShort(request.Context(), *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		writer.WriteHeader(http.StatusConflict)
@@ -67,9 +70,9 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 	_, _ = writer.Write([]byte(adapters.CreatePublicURL(key)))
 }
 
-func (r *HTTPHandlers) getShortHandler(writer http.ResponseWriter, request *http.Request) {
+func (r *HTTPHandlers) getOriginLinkHandler(writer http.ResponseWriter, request *http.Request) {
 	hashkey := chi.URLParam(request, "hash")
-	originURL, err := r.urlRepo.GetByHash(request.Context(), hashkey)
+	originURL, err := r.service.GetOriginLink(request.Context(), hashkey)
 	if errors.Is(err, domain.ErrURLDeleted) {
 		writer.WriteHeader(http.StatusGone)
 		return
@@ -111,8 +114,7 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	key := r.genShortURLToken()
-	err = r.urlRepo.Add(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
+	key, err := r.service.CreateShort(request.Context(), *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.Header().Set("Content-Type", "application/json")
@@ -176,12 +178,11 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 			return
 		}
 		originURLs = append(originURLs, domain.BatchItem{
-			HashKey: r.genShortURLToken(),
-			URL:     *u,
+			URL: *u,
 		})
 	}
 
-	err = r.urlRepo.BatchAdd(request.Context(), originURLs, adapters.MustUserIDFromReq(request))
+	originURLs, err = r.service.BatchAdd(request.Context(), originURLs, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.WriteHeader(http.StatusConflict)
@@ -220,7 +221,7 @@ func (r *HTTPHandlers) ping(w http.ResponseWriter, request *http.Request) {
 }
 
 func (r *HTTPHandlers) getMyUrls(w http.ResponseWriter, request *http.Request) {
-	list, err := r.urlRepo.GetByUser(request.Context(), adapters.MustUserIDFromReq(request))
+	list, err := r.service.GetByUser(request.Context(), adapters.MustUserIDFromReq(request))
 	if err != nil {
 		r.logger.Debug("cannot get urls", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -247,7 +248,7 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 		return len([]rune(key)) > 0
 	})
 	if len(keys) != 0 {
-		_, err = r.urlRepo.DeleteByUser(request.Context(), keys, adapters.MustUserIDFromReq(request))
+		_, err = r.service.DeleteByUser(request.Context(), keys, adapters.MustUserIDFromReq(request))
 		if err != nil {
 			r.logger.Error("cannot delete urls", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -259,18 +260,45 @@ func (r *HTTPHandlers) deleteUrls(w http.ResponseWriter, request *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (r *HTTPHandlers) stats(w http.ResponseWriter, request *http.Request) {
+	stats, err := r.service.Stats(request.Context())
+
+	if err != nil {
+		r.logger.Error("cannot get stats", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("Cannot get stats"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(stats)
+}
+
 // CreateServeMux - создание основных хендлеров
-func CreateServeMux(urlRepo domain.URLRepository, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
+func CreateServeMux(service *domain.ShortenerService, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	handlers := NewHTTPHandlers(urlRepo, adapters.GenBase64ShortURLToken, logger, pool)
+	handlers := NewHTTPHandlers(service, logger, pool)
+
+	statsHandler := WithAuth(false, gzipHandle(WithLogging(logger, handlers.stats)))
+	if internal.Config.TrustedSubnet != "" {
+		_, subnet, err := net.ParseCIDR(internal.Config.TrustedSubnet)
+		if err != nil {
+			panic(err)
+		}
+
+		statsHandler = TrustedClientMiddleware(logger, subnet)(statsHandler)
+	}
 
 	r.Post("/", WithAuth(false, gzipHandle(WithLogging(logger, handlers.createShortHandler))))
-	r.Get("/{hash}", WithAuth(false, gzipHandle(WithLogging(logger, handlers.getShortHandler))))
+	r.Get("/{hash}", WithAuth(false, gzipHandle(WithLogging(logger, handlers.getOriginLinkHandler))))
 	r.Post("/api/shorten", WithAuth(false, gzipHandle(WithLogging(logger, handlers.shorten))))
 	r.Post("/api/shorten/batch", WithAuth(false, gzipHandle(WithLogging(logger, handlers.batchShorten))))
 	r.Get("/api/user/urls", WithAuth(true, gzipHandle(WithLogging(logger, handlers.getMyUrls))))
 	r.Delete("/api/user/urls", WithAuth(false, gzipHandle(WithLogging(logger, handlers.deleteUrls))))
+	r.Get("/api/internal/stats", statsHandler)
+
 	r.Get("/ping", handlers.ping)
 	r.Mount("/debug", middleware.Profiler())
 

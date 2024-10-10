@@ -10,6 +10,7 @@ import (
 	"github.com/sashaaro/url-shortener/internal/utils"
 	"go.uber.org/zap"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -243,5 +244,37 @@ func WithAuth(authRequired bool, h http.HandlerFunc) http.HandlerFunc {
 		})
 
 		h.ServeHTTP(w, r.WithContext(adapters.UserIDToCxt(r.Context(), userID)))
+	}
+}
+
+var xRealIP = http.CanonicalHeaderKey("X-Real-IP")
+
+// TrustedClientMiddleware проверка c TRUSTED_SUBNET
+func TrustedClientMiddleware(logger zap.SugaredLogger, trustedSubnet *net.IPNet) func(next http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(writer http.ResponseWriter, request *http.Request) {
+			if trustedSubnet != nil {
+				realIP := request.Header.Get(xRealIP)
+				logger.Info("request from client")
+				if realIP == "" || !trustedSubnet.Contains(net.ParseIP(realIP)) {
+					logger.Warn("access denied")
+					http.Error(writer, "Access denied", http.StatusForbidden)
+					return
+				}
+			}
+			next.ServeHTTP(writer, request)
+		}
+	}
+}
+
+// SetRealIPMutator мутатор
+func SetRealIPMutator() func(r *http.Request) (*http.Request, error) {
+	return func(request *http.Request) (*http.Request, error) {
+		myIP, err := utils.GetMyHostIP()
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set(xRealIP, myIP.String())
+		return request, nil
 	}
 }

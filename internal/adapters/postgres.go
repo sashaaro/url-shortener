@@ -19,6 +19,22 @@ type PgURLRepository struct {
 	pool *pgxpool.Pool
 }
 
+// CountUrls количество ссылок
+func (r *PgURLRepository) CountUrls(ctx context.Context) (int64, error) {
+	row := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM urls")
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+// CountUsers количество пользователей
+func (r *PgURLRepository) CountUsers(ctx context.Context) (int64, error) {
+	row := r.pool.QueryRow(ctx, "SELECT COUNT(DISTINCT user_id) FROM urls")
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 // DeleteByUser -удаление
 func (r *PgURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	res, err := r.pool.Exec(ctx, "UPDATE urls SET is_deleted = true WHERE key = ANY($1)", keys)

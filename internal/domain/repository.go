@@ -45,6 +45,8 @@ type URLRepository interface {
 	GetByHash(ctx context.Context, key HashKey) (*url.URL, error)
 	GetByUser(ctx context.Context, userID uuid.UUID) ([]URLEntry, error)
 	DeleteByUser(ctx context.Context, keys []HashKey, userID uuid.UUID) (bool, error)
+	CountUrls(ctx context.Context) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
 }
 
 // GenShortURLToken - интерфейс получения
