@@ -253,16 +253,18 @@ var xRealIP = http.CanonicalHeaderKey("X-Real-IP")
 func TrustedClientMiddleware(logger zap.SugaredLogger, trustedSubnet *net.IPNet) func(next http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(writer http.ResponseWriter, request *http.Request) {
-			if trustedSubnet != nil {
-				realIP := request.Header.Get(xRealIP)
-				logger.Info("request from client")
-				if realIP == "" || !trustedSubnet.Contains(net.ParseIP(realIP)) {
-					logger.Warn("access denied")
-					http.Error(writer, "Access denied", http.StatusForbidden)
-					return
-				}
+			if trustedSubnet == nil {
+				next.ServeHTTP(writer, request)
+				return
 			}
-			next.ServeHTTP(writer, request)
+			realIP := request.Header.Get(xRealIP)
+			logger.Info("request from client")
+			if realIP == "" || !trustedSubnet.Contains(net.ParseIP(realIP)) {
+				logger.Warn("access denied")
+				http.Error(writer, "Access denied", http.StatusForbidden)
+			} else {
+				next.ServeHTTP(writer, request)
+			}
 		}
 	}
 }
