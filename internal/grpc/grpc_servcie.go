@@ -27,7 +27,6 @@ func NewGrpcService(service *domain.ShortenerService, genShortURLToken domain.Ge
 
 // Shorten создание
 func (s *GrpcService) Shorten(ctx context.Context, req *proto.ShortenRequest) (*proto.ShortenResponse, error) {
-	key := s.genShortURLToken()
 	userID, err := uuid.Parse(req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -37,7 +36,7 @@ func (s *GrpcService) Shorten(ctx context.Context, req *proto.ShortenRequest) (*
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = s.service.CreateShort(ctx, key, *originURL, userID)
+	key, err := s.service.CreateShort(ctx, *originURL, userID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

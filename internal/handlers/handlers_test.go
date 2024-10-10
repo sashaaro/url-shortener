@@ -42,7 +42,7 @@ func TestIteration2(t *testing.T) {
 	}
 	internal.Config.TrustedSubnet = "192.168.146.0/24"
 
-	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo), logger, nil))
+	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo, adapters.GenBase64ShortURLToken), logger, nil))
 	defer testServer.Close()
 	internal.Config.BaseURL = testServer.URL
 

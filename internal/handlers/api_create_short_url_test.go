@@ -31,7 +31,7 @@ func BenchmarkApplication_APIHandlerGetURL(b *testing.B) {
 		urlRepo = adapters.NewPgURLRepository(pool)
 	}
 
-	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo), logger, nil))
+	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo, adapters.GenBase64ShortURLToken), logger, nil))
 	defer testServer.Close()
 	internal.Config.BaseURL = testServer.URL
 

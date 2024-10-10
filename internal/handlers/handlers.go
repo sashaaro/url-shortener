@@ -23,24 +23,21 @@ import (
 
 // HTTPHandlers основные хендлеры
 type HTTPHandlers struct {
-	service          *domain.ShortenerService
-	genShortURLToken domain.GenShortURLToken
-	logger           zap.SugaredLogger
-	pool             *pgxpool.Pool
+	service *domain.ShortenerService
+	logger  zap.SugaredLogger
+	pool    *pgxpool.Pool
 }
 
 // NewHTTPHandlers конструктор
 func NewHTTPHandlers(
 	service *domain.ShortenerService,
-	genShortURLToken domain.GenShortURLToken,
 	logger zap.SugaredLogger,
 	pool *pgxpool.Pool,
 ) *HTTPHandlers {
 	return &HTTPHandlers{
-		service:          service,
-		genShortURLToken: genShortURLToken,
-		logger:           logger,
-		pool:             pool,
+		service: service,
+		logger:  logger,
+		pool:    pool,
 	}
 }
 
@@ -56,8 +53,7 @@ func (r *HTTPHandlers) createShortHandler(writer http.ResponseWriter, request *h
 		http.Error(writer, "invalid url", http.StatusBadRequest)
 		return
 	}
-	key := r.genShortURLToken()
-	err = r.service.CreateShort(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
+	key, err := r.service.CreateShort(request.Context(), *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		writer.WriteHeader(http.StatusConflict)
@@ -118,8 +114,7 @@ func (r *HTTPHandlers) shorten(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	key := r.genShortURLToken()
-	err = r.service.CreateShort(request.Context(), key, *originURL, adapters.MustUserIDFromReq(request))
+	key, err := r.service.CreateShort(request.Context(), *originURL, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.Header().Set("Content-Type", "application/json")
@@ -183,12 +178,11 @@ func (r *HTTPHandlers) batchShorten(w http.ResponseWriter, request *http.Request
 			return
 		}
 		originURLs = append(originURLs, domain.BatchItem{
-			HashKey: r.genShortURLToken(),
-			URL:     *u,
+			URL: *u,
 		})
 	}
 
-	err = r.service.BatchAdd(request.Context(), originURLs, adapters.MustUserIDFromReq(request))
+	originURLs, err = r.service.BatchAdd(request.Context(), originURLs, adapters.MustUserIDFromReq(request))
 	var dupErr *domain.ErrURLAlreadyExists
 	if errors.As(err, &dupErr) {
 		w.WriteHeader(http.StatusConflict)
@@ -285,7 +279,7 @@ func (r *HTTPHandlers) stats(w http.ResponseWriter, request *http.Request) {
 func CreateServeMux(service *domain.ShortenerService, logger zap.SugaredLogger, pool *pgxpool.Pool) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	handlers := NewHTTPHandlers(service, adapters.GenBase64ShortURLToken, logger, pool)
+	handlers := NewHTTPHandlers(service, logger, pool)
 
 	statsHandler := WithAuth(false, gzipHandle(WithLogging(logger, handlers.stats)))
 	if internal.Config.TrustedSubnet != "" {

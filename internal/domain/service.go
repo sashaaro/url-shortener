@@ -15,12 +15,13 @@ type StatsResponse struct {
 
 // ShortenerService - сервис
 type ShortenerService struct {
-	urlRepo URLRepository
+	urlRepo          URLRepository
+	genShortURLToken GenShortURLToken
 }
 
 // NewShortenerService конструктор
-func NewShortenerService(urlRepo URLRepository) *ShortenerService {
-	return &ShortenerService{urlRepo: urlRepo}
+func NewShortenerService(urlRepo URLRepository, genShortURLToken GenShortURLToken) *ShortenerService {
+	return &ShortenerService{urlRepo: urlRepo, genShortURLToken: genShortURLToken}
 }
 
 // GetOriginLink получение
@@ -30,8 +31,12 @@ func (r *ShortenerService) GetOriginLink(ctx context.Context, hashkey string) (*
 }
 
 // BatchAdd создание
-func (r *ShortenerService) BatchAdd(ctx context.Context, batch []BatchItem, userID uuid.UUID) error {
-	return r.urlRepo.BatchAdd(ctx, batch, userID)
+func (r *ShortenerService) BatchAdd(ctx context.Context, batch []BatchItem, userID uuid.UUID) ([]BatchItem, error) {
+	for i, item := range batch {
+		item.HashKey = r.genShortURLToken()
+		batch[i] = item
+	}
+	return batch, r.urlRepo.BatchAdd(ctx, batch, userID)
 }
 
 // DeleteByUser удаление
@@ -45,8 +50,10 @@ func (r *ShortenerService) GetByUser(ctx context.Context, userID uuid.UUID) ([]U
 }
 
 // CreateShort создание
-func (r *ShortenerService) CreateShort(ctx context.Context, key HashKey, u url.URL, userID uuid.UUID) error {
-	return r.urlRepo.Add(ctx, key, u, userID)
+func (r *ShortenerService) CreateShort(ctx context.Context, u url.URL, userID uuid.UUID) (HashKey, error) {
+	key := r.genShortURLToken()
+
+	return key, r.urlRepo.Add(ctx, key, u, userID)
 }
 
 // Stats статистика

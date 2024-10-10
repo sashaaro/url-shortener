@@ -58,7 +58,7 @@ func main() {
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
-	shrtenerService := domain.NewShortenerService(urlRepo)
+	shrtenerService := domain.NewShortenerService(urlRepo, adapters.GenBase64ShortURLToken)
 
 	srv := http.Server{
 		Addr:    internal.Config.ServerAddress,
