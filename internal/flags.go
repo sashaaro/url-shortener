@@ -14,6 +14,7 @@ import (
 // InitConfig инициализация конфигурации
 func InitConfig() {
 	serverAddress := flag.String("a", "", "listen address")
+	grpcPort := flag.Int("g", 0, "grpc port")
 	baseURL := flag.String("b", "", "base url")
 	databaseDSN := flag.String("d", "", "database dsn")
 	enableHttps := flag.String("s", "", "Enable https")
@@ -28,6 +29,9 @@ func InitConfig() {
 	}
 	if Config.ServerAddress == "" {
 		Config.ServerAddress = *serverAddress
+	}
+	if Config.GrpcPort == 0 {
+		Config.GrpcPort = *grpcPort
 	}
 	if Config.BaseURL == "" {
 		Config.BaseURL = *baseURL
@@ -93,6 +97,9 @@ func parseFromConfigFile(configFile *string) {
 	if c.DatabaseDSN != "" {
 		Config.DatabaseDSN = c.DatabaseDSN
 	}
+	if c.TrustedSubnet != "" {
+		Config.TrustedSubnet = c.TrustedSubnet
+	}
 }
 
 type jsonConfig struct {
@@ -101,4 +108,5 @@ type jsonConfig struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }

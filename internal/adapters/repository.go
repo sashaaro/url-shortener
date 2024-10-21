@@ -30,6 +30,20 @@ type memURLRepository struct {
 	mx       sync.Mutex
 }
 
+// CountUrls количество ссылок
+func (m *memURLRepository) CountUrls(ctx context.Context) (int64, error) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	return int64(len(m.urlStore)), nil
+}
+
+// CountUsers количество пользователей
+func (m *memURLRepository) CountUsers(ctx context.Context) (int64, error) {
+	m.mx.Lock()
+	defer m.mx.Unlock()
+	return int64(len(m.urlStore)), nil
+}
+
 // DeleteByUser удаление ссылок пользователя
 func (m *memURLRepository) DeleteByUser(ctx context.Context, keys []domain.HashKey, userID uuid.UUID) (bool, error) {
 	m.mx.Lock()
@@ -140,6 +154,18 @@ type FileURLRepository struct {
 	encoder *json.Encoder
 	wrapped domain.URLRepository
 	logger  zap.SugaredLogger
+}
+
+// CountUrls количество ссылок
+func (f *FileURLRepository) CountUrls(ctx context.Context) (int64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+// CountUsers количество пользователей
+func (f *FileURLRepository) CountUsers(ctx context.Context) (int64, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // DeleteByUser удаление

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/sashaaro/url-shortener/internal"
 	"github.com/sashaaro/url-shortener/internal/adapters"
+	"github.com/sashaaro/url-shortener/internal/domain"
 	"github.com/sashaaro/url-shortener/internal/infra"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -30,7 +31,7 @@ func BenchmarkApplication_APIHandlerGetURL(b *testing.B) {
 		urlRepo = adapters.NewPgURLRepository(pool)
 	}
 
-	testServer := httptest.NewServer(CreateServeMux(urlRepo, logger, nil))
+	testServer := httptest.NewServer(CreateServeMux(domain.NewShortenerService(urlRepo, adapters.GenBase64ShortURLToken), logger, nil))
 	defer testServer.Close()
 	internal.Config.BaseURL = testServer.URL
 
